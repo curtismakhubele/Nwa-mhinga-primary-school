@@ -8,7 +8,7 @@
 button,input,select,textarea{font:inherit}button{cursor:pointer}
 .login{min-height:100vh;display:grid;grid-template-columns:1.35fr .65fr;background:#071b2a}
 .hero{position:relative;overflow:hidden;min-height:100vh;padding:55px 7%;display:flex;flex-direction:column;justify-content:center;color:#fff;background:
-linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("../assets/school-bg.svg") center/cover}
+linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("school-bg.svg") center/cover}
 .hero:after{content:"";position:absolute;left:-5%;right:-5%;bottom:-95px;height:180px;background:var(--red);transform:rotate(-5deg);box-shadow:0 -25px 0 #11151b}
 .brand-lockup{position:relative;z-index:2;display:flex;gap:20px;align-items:center}.crest{width:86px;height:86px;border:4px solid #fff;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,#e31d2a,#94101b);font-weight:900;letter-spacing:-2px;box-shadow:0 8px 25px #0005}
 .hero h1{position:relative;z-index:2;font-size:52px;line-height:1;margin:30px 0 8px}.hero h2{position:relative;z-index:2;font-size:25px;margin:0}.hero p{position:relative;z-index:2;font-size:17px;letter-spacing:.6px}.pill-row{position:relative;z-index:2;display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.pill{border:1px solid #ffffff40;border-radius:30px;padding:9px 14px;background:#ffffff10}
@@ -19,3 +19,5 @@ linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("../assets/school
 @media(max-width:720px){.login{grid-template-columns:1fr}.hero{display:none}.sidebar{transform:translateX(-100%);transition:.2s}.sidebar.open{transform:translateX(0)}.main{margin-left:0;width:100%}.hamb{display:block}.topbar{padding:0 13px}.content{padding:15px}.cards{grid-template-columns:1fr}.grade-grid{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}.wide{grid-column:auto}.user-area .user-text{display:none}.mobile-bottom{display:flex;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);height:58px;z-index:15;justify-content:space-around}.mobile-bottom button{border:0;background:transparent;font-size:10px}.content{padding-bottom:75px}}
 
 .logo-exact{object-fit:contain;display:block;background:transparent}.hero-logo{width:92px;height:110px;border-radius:4px}.side-logo{width:40px;height:45px;border-radius:3px;flex:none}.brand-lockup{align-items:center}.brand-lockup .hero-logo{box-shadow:0 6px 18px #0006}
+
+.login-logo{width:76px;height:90px;margin:0 auto 14px}.login-card .mini-brand{text-align:center}
