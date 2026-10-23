@@ -49,7 +49,7 @@ function initials(n){return n.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUp
 function toast(m){const x=document.querySelector(".toast");if(!x)return;x.textContent=m;x.classList.add("show");setTimeout(()=>x.classList.remove("show"),2200)}
 function login(){
  document.getElementById("app").innerHTML=`<div class="login"><section class="hero">
- <div class="brand-lockup"><img class="logo-exact hero-logo" src="assets/nwa-mhinga-p-logo.png" alt="N'WA MHINGA P logo"><div><div style="font-size:22px;font-weight:900">N'WA MHINGA P</div><div style="opacity:.8">School Data Management System</div></div></div>
+ <div class="brand-lockup"><img class="logo-exact hero-logo" src="nwa-mhinga-p-logo.png" alt="N'WA MHINGA P logo"><div><div style="font-size:22px;font-weight:900">N'WA MHINGA P</div><div style="opacity:.8">School Data Management System</div></div></div>
  <h1>N'WA MHINGA P</h1><h2>School Data Management System</h2><p>Upload &nbsp; • &nbsp; Store &nbsp; • &nbsp; Access &nbsp; • &nbsp; Learn</p>
  <div class="pill-row"><span class="pill">Secure School Data</span><span class="pill">Cloud Backup</span><span class="pill">Grade R–7</span><span class="pill">Parent & Learner Portal</span></div>
  <div style="position:relative;z-index:2;margin-top:35px;font-style:italic;font-size:18px">Better Data. Brighter Futures.</div>
@@ -92,7 +92,7 @@ function render(page="dashboard"){
   ["dashboard","⌂","Dashboard"],["classes","▦","My Classes"],["learners","♟","Learners"],["assessments","▣","Assessments"],["reports","▤","Reports"],["upload","⇧","Upload Data"],["backup","☁","Cloud Backup"],["users","♙","Users & Access"],["settings","⚙","Settings"]
  ];
  document.getElementById("app").innerHTML=`<div class="shell"><aside class="sidebar" id="side">
- <div class="side-head"><img class="logo-exact side-logo" src="assets/nwa-mhinga-p-logo.png" alt="N'WA MHINGA P logo"><div class="side-title">N'WA MHINGA P<small>School Data Management</small></div></div>
+ <div class="side-head"><img class="logo-exact side-logo" src="nwa-mhinga-p-logo.png" alt="N'WA MHINGA P logo"><div class="side-title">N'WA MHINGA P<small>School Data Management</small></div></div>
  <div class="nav">${nav.map(n=>can(n[0])?`<button class="${page===n[0]?'active':''}" onclick="render('${n[0]}')">${n[1]} &nbsp; ${n[2]}</button>`:"").join("")}</div>
  <div class="nav-section">Account</div><div class="nav"><button onclick="changePassword()">🔒 Change Password</button><button onclick="logout()">↪ Logout</button></div>
  </aside><main class="main"><header class="topbar"><div class="top-left"><button class="hamb" onclick="document.getElementById('side').classList.toggle('open')">☰</button><div><b>${title(page)}</b><div class="crumb">${esc(db.school.name)} / ${esc(u.role)}</div></div></div>
