@@ -33,10 +33,10 @@ const demo={
   {id:"D002",name:"School Policy.pdf",category:"School",owner:"Admin",date:"2026-10-06",size:"1.2 MB"}
  ],
  permissions:{
-  Admin:["dashboard","users","learners","classes","assessments","reports","upload","backup","settings"],
-  Principal:["dashboard","users","learners","classes","assessments","reports","upload","backup","settings"],
-  "Vice Principal":["dashboard","learners","classes","assessments","reports","upload","backup"],
-  Teacher:["dashboard","learners","classes","assessments","reports","upload"],
+  Admin:["dashboard","users","learners","classes","assessments","reports","upload","backup","settings","attendance"],
+  Principal:["dashboard","users","learners","classes","assessments","reports","upload","backup","settings","attendance"],
+  "Vice Principal":["dashboard","learners","classes","assessments","reports","upload","backup","attendance"],
+  Teacher:["dashboard","learners","classes","assessments","reports","upload","attendance"],
   Parent:["dashboard","learners","assessments","reports"],
   Learner:["dashboard","assessments","reports"]
  },
@@ -54,7 +54,7 @@ function login(){
  <div class="pill-row"><span class="pill">Secure School Data</span><span class="pill">Cloud Backup</span><span class="pill">Grade R–7</span><span class="pill">Parent & Learner Portal</span></div>
  <div style="position:relative;z-index:2;margin-top:35px;font-style:italic;font-size:18px">Better Data. Brighter Futures.</div>
  </section><section class="login-panel"><div class="login-card">
- <div class="mini-brand">N'WA MHINGA <span>P</span></div><div class="muted">School Data Management System</div>
+ <img class="logo-exact login-logo" src="nwa-mhinga-p-logo.png" alt="School logo"><div class="mini-brand">N'WA MHINGA <span>P</span></div><div class="muted">School Data Management System</div>
  <h2>Welcome Back</h2><div class="muted">Sign in to access your learning platform</div>
  <div class="field"><label>Username / Email</label><input id="email" class="input" value="admin@nwamhingap.co.za"></div>
  <div class="field"><label>Password</label><input id="password" class="input" type="password" value="Admin@123"></div>
@@ -85,11 +85,11 @@ function assignedLearners(){
  if(["Parent","Learner"].includes(u.role))return db.learners.filter(l=>l.id===u.learnerId);
  return [];
 }
-function title(p){return ({dashboard:"Dashboard",users:"User & Access Management",learners:"Learner Records",classes:"My Classes",assessments:"Assessments",reports:"Reports",upload:"Upload Educational Data",backup:"Cloud Backup",settings:"Settings"}[p]||p)}
+function title(p){return ({dashboard:"Dashboard",users:"User & Access Management",learners:"Learner Records",classes:"My Classes",assessments:"Assessments",reports:"Reports",upload:"Upload Educational Data",backup:"Cloud Backup",settings:"Settings",attendance:"Staff Attendance"}[p]||p)}
 function render(page="dashboard"){
  if(!can(page))page="dashboard";
  const u=me(), nav=[
-  ["dashboard","⌂","Dashboard"],["classes","▦","My Classes"],["learners","♟","Learners"],["assessments","▣","Assessments"],["reports","▤","Reports"],["upload","⇧","Upload Data"],["backup","☁","Cloud Backup"],["users","♙","Users & Access"],["settings","⚙","Settings"]
+  ["dashboard","⌂","Dashboard"],["classes","▦","My Classes"],["attendance","◷","Staff Attendance"],["learners","♟","Learners"],["assessments","▣","Assessments"],["reports","▤","Reports"],["upload","⇧","Upload Data"],["backup","☁","Cloud Backup"],["users","♙","Users & Access"],["settings","⚙","Settings"]
  ];
  document.getElementById("app").innerHTML=`<div class="shell"><aside class="sidebar" id="side">
  <div class="side-head"><img class="logo-exact side-logo" src="nwa-mhinga-p-logo.png" alt="N'WA MHINGA P logo"><div class="side-title">N'WA MHINGA P<small>School Data Management</small></div></div>
@@ -102,7 +102,7 @@ function render(page="dashboard"){
 function stat(icon,label,num,sub){return `<div class="card stat"><div><div class="muted">${label}</div><div class="num">${num}</div><div class="muted">${sub}</div></div><div class="stat-icon">${icon}</div></div>`}
 function pageHTML(p){
  if(p==="dashboard")return dashboard(); if(p==="users")return users(); if(p==="learners")return learners(); if(p==="classes")return classes();
- if(p==="assessments")return assessments(); if(p==="reports")return reports(); if(p==="upload")return upload(); if(p==="backup")return backup(); return settings();
+ if(p==="assessments")return assessments(); if(p==="reports")return reports(); if(p==="upload")return upload(); if(p==="backup")return backup(); if(p==="attendance")return staffAttendancePage(); return settings();
 }
 function dashboard(){
  const u=me(), ls=assignedLearners(), n=ls.length;
