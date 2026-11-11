@@ -21,3 +21,5 @@ linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("school-bg.svg") 
 .logo-exact{object-fit:contain;display:block;background:transparent}.hero-logo{width:92px;height:110px;border-radius:4px}.side-logo{width:40px;height:45px;border-radius:3px;flex:none}.brand-lockup{align-items:center}.brand-lockup .hero-logo{box-shadow:0 6px 18px #0006}
 
 .login-logo{width:76px;height:90px;margin:0 auto 14px}.login-card .mini-brand{text-align:center}
+
+.admissions-entry{margin-top:12px}.admissions-entry .btn{display:block;text-align:center;text-decoration:none}.admissions-entry p{text-align:center;margin:10px 0 0}
