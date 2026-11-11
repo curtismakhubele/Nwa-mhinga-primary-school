@@ -23,3 +23,19 @@ linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("school-bg.svg") 
 .login-logo{width:76px;height:90px;margin:0 auto 14px}.login-card .mini-brand{text-align:center}
 
 .admissions-entry{margin-top:12px}.admissions-entry .btn{display:block;text-align:center;text-decoration:none}.admissions-entry p{text-align:center;margin:10px 0 0}
+
+.school-directions{display:inline-block;margin-top:12px;color:#1454aa;font-weight:800;text-align:center}
+.public-feed{width:min(430px,100%);max-height:310px;overflow:auto;margin:16px 0;padding:14px;background:#f6f8fb;border:1px solid var(--line);border-radius:12px}
+.public-feed h2{font-size:18px;margin:0 0 4px}
+.media-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:16px}
+.media-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
+.media-card img,.media-card video{display:block;width:100%;max-height:220px;object-fit:cover;border-radius:8px;background:#0a1924}
+.media-card h3{font-size:15px;margin:10px 0 4px}
+.media-card p{font-size:13px}
+.media-card .btn{margin-top:6px}
+.class-card{width:100%;border:0;text-align:left;cursor:pointer;color:#fff;font:inherit}
+.class-card span{display:block;margin-top:10px;font-size:12px;font-weight:800}
+.term-block{margin-top:16px;padding-top:10px;border-top:1px solid var(--line)}
+.term-block h4{margin:0 0 8px}
+.admissions-entry{margin-top:12px}.admissions-entry .btn{display:block;text-align:center;text-decoration:none}.admissions-entry p{text-align:center;margin:10px 0 0}
+@media(max-width:720px){.public-feed{max-height:none}.media-grid{grid-template-columns:1fr}}
