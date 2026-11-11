@@ -89,7 +89,7 @@ function title(p){return ({dashboard:"Dashboard",users:"User & Access Management
 function render(page="dashboard"){
  if(!can(page))page="dashboard";
  const u=me(), nav=[
-  ["dashboard","⌂","Dashboard"],["classes","▦","My Classes"],["attendance","◷","Staff Attendance"],["learners","♟","Learners"],["assessments","▣","Assessments"],["reports","▤","Reports"],["upload","⇧","Upload Data"],["backup","☁","Cloud Backup"],["users","♙","Users & Access"],["settings","⚙","Settings"]
+  ["dashboard","⌂","Dashboard"],["classes","▦","My Classes"],["attendance","◷","Staff Attendance"],["learners","♟","Learners"],["assessments","▣","Assessments"],["reports","▤","Reports"],["upload","⇧","Upload Data"],["media","▧","Media & Lessons"],["admissions","▣","Admissions Inbox"],["backup","☁","Cloud Backup"],["users","♙","Users & Access"],["settings","⚙","Settings"]
  ];
  document.getElementById("app").innerHTML=`<div class="shell"><aside class="sidebar" id="side">
  <div class="side-head"><img class="logo-exact side-logo" src="nwa-mhinga-p-logo.png" alt="N'WA MHINGA P logo"><div class="side-title">N'WA MHINGA P<small>School Data Management</small></div></div>
