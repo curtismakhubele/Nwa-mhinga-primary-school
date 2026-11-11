@@ -25,6 +25,11 @@ function remoteMediaCard(p, admin) {
     (admin ? '<button class="btn btn-danger" onclick="removeMedia(\'' + esc(p.id) + '\')">Remove</button>' : '') + '</article>';
 }
 window.mediaCard = remoteMediaCard;
+window.dashboardPostCount = function() { return mediaApiMode ? mediaRemotePosts.filter(p => p.published !== false).length : (db.mediaPosts || []).filter(p => p.published !== false).length; };
+window.dashboardPosts = function() {
+  const posts = (mediaApiMode ? mediaRemotePosts : (db.mediaPosts || [])).filter(p => p.published !== false).slice(0, 3);
+  return posts.length ? posts.map(p => remoteMediaCard(p, false)).join("") : "<p class='empty'>School news and lessons will appear here.</p>";
+};
 window.loginMedia = function() {
   const posts = mediaApiMode ? mediaRemotePosts : (db.mediaPosts || []);
   return '<h2>News, announcements & lessons</h2><p class="muted">Updates shared by the school.</p>' +
@@ -37,6 +42,10 @@ async function refreshPublicMedia() {
   mediaRemotePosts = Array.isArray(data.items) ? data.items : [];
   const feed = document.querySelector(".public-feed");
   if (feed) feed.innerHTML = window.loginMedia();
+  const dashboardFeed = document.getElementById("dashboardNews");
+  if (dashboardFeed) dashboardFeed.innerHTML = window.dashboardPosts();
+  const resourceCount = document.querySelector(".dash-stat:nth-child(4) strong");
+  if (resourceCount) resourceCount.textContent = window.dashboardPostCount();
 }
 async function refreshAdminMedia() {
   const host = document.getElementById("media-admin-list");
@@ -150,3 +159,4 @@ async function initializeMediaApp() {
   }
 }
 initializeMediaApp();
+
