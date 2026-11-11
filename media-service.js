@@ -1,6 +1,9 @@
 "use strict";
 let mediaApiMode = false;
 let mediaRemotePosts = [];
+let mediaAdminView = "All";
+let mediaUsedBytes = 0;
+let mediaLimitBytes = 0;
 let localPortalLogin = window.doLogin;
 let localPortalLogout = window.logout;
 let localPortalMe = window.me;
@@ -16,12 +19,14 @@ function portalUrl(value) {
 function remoteMediaCard(p, admin) {
   const url = portalUrl(p.fileUrl || p.url || "");
   let media = "";
-  if (["Photo", "News", "Announcement"].includes(p.type) && url) media = '<img loading="lazy" src="' + url + '" alt="' + esc(p.title) + '">';
+  if (["Photo", "Image", "News", "Announcement"].includes(p.type) && url && String(p.mimeType || "").startsWith("image/")) media = '<img loading="lazy" src="' + url + '" alt="' + esc(p.title) + '">';
   else if (p.type === "Video" && url) media = '<video controls preload="none" src="' + url + '"></video>';
-  else if (p.type === "Lesson" && url) media = p.mimeType === "application/pdf"
-    ? '<a class="btn btn-blue" target="_blank" rel="noopener noreferrer" href="' + url + '">Open lesson PDF</a>'
-    : '<video controls preload="none" src="' + url + '"></video>';
-  return '<article class="media-card">' + media + '<h3>' + esc(p.title) + '</h3><p>' + esc(p.description || "") + '</p><small class="muted">' + esc(p.createdAt || "") + '</small>' +
+  else if (p.type === "Audio" && url) media = '<audio controls preload="none" src="' + url + '"></audio>';
+  else if (["Document", "Lesson"].includes(p.type) && url) media = p.mimeType === "application/pdf"
+    ? '<a class="btn btn-blue" target="_blank" rel="noopener noreferrer" href="' + url + '">Open ' + (p.type === "Lesson" ? "lesson" : "document") + ' PDF</a>'
+    : String(p.mimeType || "").startsWith("audio/") ? '<audio controls preload="none" src="' + url + '"></audio>' : '<video controls preload="none" src="' + url + '"></video>';
+  const lessonInfo = p.type === "Lesson" ? '<small class="muted lesson-meta">' + [p.grade, p.subject, p.teacher, p.lessonDate].filter(Boolean).map(esc).join(" · ") + '</small>' : "";
+  return '<article class="media-card">' + media + '<h3>' + esc(p.title) + '</h3><p>' + esc(p.description || "") + '</p>' + lessonInfo + '<small class="muted">' + esc(p.createdAt || "") + '</small>' +
     (admin ? '<button class="btn btn-danger" onclick="removeMedia(\'' + esc(p.id) + '\')">Remove</button>' : '') + '</article>';
 }
 window.mediaCard = remoteMediaCard;
@@ -56,20 +61,45 @@ async function refreshAdminMedia() {
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || "Could not load media.");
     mediaRemotePosts = Array.isArray(data.items) ? data.items : [];
-    host.innerHTML = '<p class="muted">Storage used: ' + (data.usedBytes / 1048576).toFixed(1) + ' MB / ' + (data.limitBytes / 1048576).toFixed(0) + ' MB</p><div class="media-grid">' +
-      (mediaRemotePosts.map(p => remoteMediaCard(p, true)).join("") || '<div class="card empty">No school posts yet.</div>') + '</div>';
+    mediaUsedBytes = Number(data.usedBytes || 0);
+    mediaLimitBytes = Number(data.limitBytes || 0);
+    drawAdminMedia();
   } catch (err) { host.innerHTML = '<p class="err" style="display:block">' + esc(err.message) + '</p>'; }
 }
+function drawAdminMedia() {
+  const host = document.getElementById("media-admin-list"); if (!host) return;
+  const kinds = ["All", "Lesson", "Photo", "Video", "Audio", "Document", "Announcement", "News"];
+  const posts = mediaRemotePosts.filter(p => mediaAdminView === "All" || p.type === mediaAdminView);
+  const lessons = posts.filter(p => p.type === "Lesson");
+  const body = mediaAdminView === "Lesson"
+    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Title</th><th>Grade</th><th>Subject</th><th>Teacher</th><th>Date</th><th></th></tr></thead><tbody>' +
+      (lessons.map(p => '<tr><td><b>' + esc(p.title) + '</b><div class="muted">' + esc(p.description || "") + '</div></td><td>' + esc(p.grade || "—") + '</td><td>' + esc(p.subject || "—") + '</td><td>' + esc(p.teacher || "—") + '</td><td>' + esc(p.lessonDate || "—") + '</td><td><button class="btn btn-danger" onclick="removeMedia(\'' + esc(p.id) + '\')">Delete</button></td></tr>').join("") || '<tr><td colspan="6" class="empty">No lessons published yet.</td></tr>') + '</tbody></table></div>'
+    : '<div class="media-grid">' + (posts.map(p => remoteMediaCard(p, true)).join("") || '<div class="card empty">No ' + (mediaAdminView === "All" ? "school posts" : esc(mediaAdminView.toLowerCase() + " posts")) + ' yet.</div>') + '</div>';
+  host.innerHTML = '<div class="media-storage-line">Storage used: ' + (mediaUsedBytes / 1048576).toFixed(1) + ' MB / ' + (mediaLimitBytes / 1048576).toFixed(0) + ' MB</div><div class="filter-bar media-filters">' +
+    kinds.map(k => '<button class="filter-btn ' + (mediaAdminView === k ? 'active' : '') + '" onclick="setMediaAdminView(\'' + k + '\')">' + k + (k === "Lesson" ? ' · ' + mediaRemotePosts.filter(p => p.type === "Lesson").length : '') + '</button>').join("") + '</div>' + body;
+}
+window.setMediaAdminView = function(view) { mediaAdminView = view; drawAdminMedia(); };
 window.mediaAdmin = function() {
   if (!mediaApiMode) return localMediaAdmin();
   setTimeout(refreshAdminMedia, 0);
-  return '<div class="page-title"><div><h1>Media, Lessons & News</h1><div class="muted">Published posts appear on the login page.</div></div></div>' +
-    '<div class="card"><div class="form-grid"><div class="field"><label for="mediaTitle">Title</label><input id="mediaTitle" class="input" maxlength="120"></div>' +
-    '<div class="field"><label for="mediaType">Post type</label><select id="mediaType"><option>Photo</option><option>Video</option><option>Lesson</option><option>Announcement</option><option>News</option></select></div>' +
+  mediaAdminView = "All";
+  return '<div class="page-title"><div><h1>School Media & Lessons</h1><div class="muted">Publish lessons, photos, videos, audio, documents, news and announcements.</div></div></div>' +
+    '<div class="card"><div class="form-grid"><div class="field"><label for="mediaTitle">Title</label><input id="mediaTitle" class="input" maxlength="120" required></div>' +
+    '<div class="field"><label for="mediaType">Post type</label><select id="mediaType" onchange="mediaTypeChanged()"><option>Lesson</option><option>Photo</option><option>Video</option><option>Audio</option><option>Document</option><option>Announcement</option><option>News</option></select></div>' +
+    '<div class="field"><label for="mediaGrade">Grade</label><select id="mediaGrade">' + ["Grade R","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7"].map(g=>'<option>'+g+'</option>').join("") + '</select></div>' +
+    '<div class="field"><label for="mediaSubject">Subject</label><select id="mediaSubject">' + ["English","Mathematics","Life Skills","Natural Sciences","Social Sciences","Technology","itsonga","Other"].map(s=>'<option>'+s+'</option>').join("") + '</select></div>' +
+    '<div class="field"><label for="mediaTeacher">Teacher</label><input id="mediaTeacher" class="input" maxlength="100" placeholder="Teacher name"></div>' +
+    '<div class="field"><label for="mediaLessonDate">Lesson date</label><input id="mediaLessonDate" class="input" type="date" value="' + new Date().toISOString().slice(0,10) + '"></div>' +
     '<div class="field wide"><label for="mediaDescription">Description / announcement</label><textarea id="mediaDescription" class="input" maxlength="1000"></textarea></div>' +
-    '<div class="field wide"><label for="mediaFile">Upload photo, video or lesson (max 50 MB)</label><input id="mediaFile" class="input" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,application/pdf"></div></div>' +
-    '<p class="muted">F1 prototype storage is limited. Do not upload private learner information or photos without school consent.</p><button class="btn btn-primary" onclick="publishMedia()">Publish to login page</button></div>' +
+    '<div class="field wide"><label for="mediaFile">Upload a file (max 50 MB)</label><input id="mediaFile" class="input" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,audio/mpeg,audio/mp4,audio/webm,audio/ogg,audio/wav,application/pdf"></div></div>' +
+    '<p class="muted">Files and posts are shared on the public login page. F1 storage is limited to the configured app quota.</p><button class="btn btn-primary" onclick="publishMedia()">Publish</button></div>' +
     '<div id="media-admin-list" style="margin-top:16px"><div class="card empty">Loading school posts…</div></div>';
+};
+window.mediaTypeChanged = function() {
+  const isLesson = document.getElementById("mediaType")?.value === "Lesson";
+  ["mediaGrade", "mediaSubject", "mediaTeacher", "mediaLessonDate"].forEach(id => {
+    const field = document.getElementById(id); if (field) field.closest(".field").hidden = !isLesson;
+  });
 };
 window.publishMedia = async function() {
   if (!mediaApiMode) return toast("Shared uploads need the F1 app server; this browser-only page cannot publish for everyone.");
@@ -78,9 +108,16 @@ window.publishMedia = async function() {
   const description = document.getElementById("mediaDescription")?.value.trim() || "";
   const file = document.getElementById("mediaFile")?.files?.[0] || null;
   if (!title) return toast("Enter a title.");
-  if (["Photo", "Video", "Lesson"].includes(type) && !file) return toast("Choose a file to upload.");
+  if (["Photo", "Video", "Audio", "Document", "Lesson"].includes(type) && !file) return toast("Choose a file to upload.");
+  if (type === "Lesson" && (!document.getElementById("mediaGrade")?.value || !document.getElementById("mediaSubject")?.value || !document.getElementById("mediaLessonDate")?.value)) return toast("Choose the lesson grade, subject and date.");
   const form = new FormData();
   form.append("title", title); form.append("type", type); form.append("description", description);
+  if (type === "Lesson") {
+    form.append("grade", document.getElementById("mediaGrade").value);
+    form.append("subject", document.getElementById("mediaSubject").value);
+    form.append("teacher", document.getElementById("mediaTeacher").value.trim());
+    form.append("lessonDate", document.getElementById("mediaLessonDate").value);
+  }
   if (file) form.append("file", file);
   try {
     const r = await fetch("/api/admin/media", { method: "POST", credentials: "same-origin", body: form });
@@ -90,7 +127,7 @@ window.publishMedia = async function() {
     document.getElementById("mediaTitle").value = "";
     document.getElementById("mediaDescription").value = "";
     const picker = document.getElementById("mediaFile"); if (picker) picker.value = "";
-    await refreshPublicMedia(); await refreshAdminMedia(); toast("Post published on the login page.");
+    await refreshPublicMedia(); await refreshAdminMedia(); toast("Published on the login page.");
   } catch (err) { toast(err.message); }
 };
 window.removeMedia = async function(id) {

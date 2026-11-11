@@ -101,6 +101,7 @@ The repository includes an Express server for shared media/news publishing. On a
 3. Set `SCHOOL_MEDIA_LIMIT_BYTES=629145600` (600 MiB) to reserve space below F1's 1 GB app-storage ceiling.
 4. Enable build during deployment so App Service installs `package.json` dependencies.
 
-Admins can upload JPG, PNG, WEBP, MP4, WEBM, and PDF files up to 50 MB. Announcements and news can be posted as text. Published items appear on the login page. Admin sign-in uses an HTTP-only Secure cookie.
+Admins can publish JPG, PNG, WEBP, MP4, WEBM, MP3, M4A, OGG, WAV, and PDF content up to 50 MB. Lessons include grade, subject, teacher, and date fields; media, lessons, news, and announcements appear on the login page. Admin sign-in uses an HTTP-only Secure cookie.
 
 F1 is a demo host only. It is not an Azure Blob Storage account, has no production SLA, and cannot support the 250 TB target. The media files and content JSON live on the F1 app's persistent storage and must be migrated to Blob Storage before real operational use. This server does not make the existing admissions or learner-data flows multi-user.
+

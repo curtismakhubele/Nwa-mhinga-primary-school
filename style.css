@@ -33,6 +33,15 @@ linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("school-bg.svg") 
 .media-card h3{font-size:15px;margin:10px 0 4px}
 .media-card p{font-size:13px}
 .media-card .btn{margin-top:6px}
+.media-card audio{display:block;width:100%;margin:6px 0}
+.lesson-meta{display:block;padding:6px 8px;border-radius:7px;background:#f4f1f8;color:#625181}
+.media-storage-line{font-size:12px;color:var(--muted);margin:0 0 9px}
+.media-filters{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 13px}
+.media-filter{border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--text);padding:7px 11px;font-size:11px;font-weight:700;cursor:pointer}
+.media-filter.active{background:#6d548d;color:#fff;border-color:#6d548d}
+.filter-bar{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0 13px}
+.filter-btn{border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--text);padding:7px 11px;font-size:11px;font-weight:700;cursor:pointer}
+.filter-btn.active{background:#6d548d;color:#fff;border-color:#6d548d}
 .class-card{width:100%;border:0;text-align:left;cursor:pointer;color:#fff;font:inherit}
 .class-card span{display:block;margin-top:10px;font-size:12px;font-weight:800}
 .term-block{margin-top:16px;padding-top:10px;border-top:1px solid var(--line)}
