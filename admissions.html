@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admissions – N'wa Mhinga Primary School</title>
+<style>
+  :root{
+    --paper:#f3f6fb; --surface:#ffffff; --ink:#14213d; --muted:#51607a;
+    --line:#b9c6dc; --accent:#1f4fa3; --accent-ink:#ffffff; --office:#e9edf5; --err:#b3261e; --ok:#1b7a43;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#0f1626; --surface:#17203a; --ink:#e8edf8; --muted:#9fb0cf;
+      --line:#34456b; --accent:#7ea6ff; --accent-ink:#0f1626; --office:#1d2846; --err:#ff8a80; --ok:#6fd49a;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 "Source Sans 3","Segoe UI",system-ui,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:20px 16px 80px}
+  header.head{background:var(--surface);border:1.5px solid var(--ink);padding:18px 20px;margin-bottom:14px}
+  header.head h1{margin:0;font:700 1.45rem/1.2 Georgia,"Times New Roman",serif}
+  header.head p{margin:4px 0 0;color:var(--muted)}
+  .meta{display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:10px;font-size:.95rem}
+  .steps{display:flex;gap:8px;margin:0 0 16px;padding:0;list-style:none}
+  .steps li{flex:1;padding:8px 10px;border-bottom:4px solid var(--line);font-weight:600;color:var(--muted);font-size:.92rem}
+  .steps li.on{border-color:var(--accent);color:var(--ink)}
+  .steps li.done{border-color:var(--ok);color:var(--ink)}
+  .note{background:var(--surface);border-left:4px solid var(--accent);padding:10px 14px;margin-bottom:18px;font-size:.95rem}
+  fieldset{background:var(--surface);border:1.5px solid var(--line);margin:0 0 18px;padding:14px 16px 16px;min-width:0}
+  legend{font:700 1.05rem Georgia,serif;padding:0 8px}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .c3{grid-column:span 3}.c4{grid-column:span 4}.c6{grid-column:span 6}.c8{grid-column:span 8}.c12{grid-column:span 12}
+  @media(max-width:640px){.c3,.c4,.c6,.c8{grid-column:span 12}.steps li{font-size:.8rem}}
+  label,.lbl{display:block;font-size:.88rem;font-weight:600;color:var(--muted);margin-bottom:3px}
+  input[type=text],input[type=email],input[type=tel],input[type=date],input[type=number],select,textarea{
+    width:100%;padding:9px 10px;font:inherit;color:var(--ink);background:var(--paper);
+    border:1.5px solid var(--line);border-radius:3px}
+  textarea{min-height:70px;resize:vertical}
+  input:focus,select:focus,textarea:focus,button:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+  .invalid{border-color:var(--err)!important}
+  .opts{display:flex;flex-wrap:wrap;gap:6px 18px;padding-top:6px}
+  .opts label{display:inline-flex;align-items:center;gap:6px;font-weight:500;color:var(--ink);font-size:1rem;margin:0}
+  .opts input{width:20px;height:20px;accent-color:var(--accent)}
+  .hint{font-size:.85rem;color:var(--muted);margin:2px 0 0}
+  .sib{display:grid;grid-template-columns:1fr 110px;gap:12px;margin-bottom:10px}
+  .office{background:var(--office);border-style:dashed}
+  .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
+  button{font:600 1rem inherit;font-family:inherit;padding:12px 22px;border-radius:3px;cursor:pointer;border:1.5px solid var(--accent)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .primary{background:var(--accent);color:var(--accent-ink)}
+  .secondary{background:transparent;color:var(--accent)}
+  .sig{border-bottom:1.5px solid var(--ink);height:44px}
+  .gradebar{background:var(--surface);border:1.5px solid var(--accent);padding:14px 16px;margin-bottom:18px}
+  .gradebar select{max-width:260px}
+  .hidden{display:none!important}
+  .err{color:var(--err);font-weight:600;margin-top:10px;display:none}
+  .doc{border:1.5px solid var(--line);background:var(--surface);padding:12px 14px;margin-bottom:12px}
+  .doc h3{margin:0 0 2px;font-size:1rem}
+  .doc ul{list-style:none;margin:8px 0 0;padding:0}
+  .doc li{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.92rem;padding:4px 0;border-top:1px solid var(--line)}
+  .doc li button{padding:2px 10px;font-size:.85rem}
+  .doc.ok{border-color:var(--ok)}
+  .tick{color:var(--ok);font-weight:700}
+  .profile{background:var(--surface);border:1.5px solid var(--ink);padding:18px 20px}
+  .profile h2{margin:0;font:700 1.35rem Georgia,serif}
+  .ref{display:inline-block;margin:8px 0 12px;padding:4px 10px;border:1.5px solid var(--ok);color:var(--ok);font-weight:700}
+  dl.kv{display:grid;grid-template-columns:minmax(130px,230px) 1fr;gap:4px 14px;margin:0}
+  dl.kv dt{color:var(--muted);font-size:.9rem}
+  dl.kv dd{margin:0;word-break:break-word}
+  .profile h3{margin:16px 0 4px;font-size:1rem;border-bottom:1px solid var(--line)}
+  .saved{margin-top:24px}
+  .saved summary{cursor:pointer;font-weight:600}
+  .saved li{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .saved button{padding:4px 12px;font-size:.88rem}
+  @media print{
+    body{background:#fff;color:#000}.actions,.steps,.saved,.note,header.head p,.noprint{display:none}
+    .profile{border-color:#000}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="head">
+  <h1>Application for admission to school</h1>
+  <p><strong>N'wa Mhinga Primary School</strong> &ndash; Grades R to 7</p>
+  <div class="meta">
+    <span>2 Ntsu Street, Pretoria, 0125</span>
+    <span>Tel: 012 375 5514</span>
+    <span>Fax: 012 375 5514</span>
+  </div>
+</header>
+<nav style="margin:-2px 0 14px"><a href="./index.html" style="color:var(--accent);font-weight:700">← Back to school portal</a></nav>
+<p class="note"><strong>Application portal preview:</strong> This version saves the application in this browser only. It does not send information to the school. Do not enter real identity, medical, or financial information until secure submission is configured.</p>
+
+<ol class="steps" id="steps">
+  <li class="on">1. Application form</li>
+  <li>2. Upload documents</li>
+  <li>3. Learner profile</li>
+</ol>
+
+<!-- STEP 1 -->
+<section id="step1">
+<form id="f" novalidate>
+
+<div class="gradebar">
+  <label for="gradeFor">Grade applied for</label>
+  <select id="gradeFor" name="Grade applied for" required>
+    <option value="">Choose a grade</option>
+    <option value="R">Grade R</option><option value="1">Grade 1</option><option value="2">Grade 2</option><option value="3">Grade 3</option>
+    <option value="4">Grade 4</option><option value="5">Grade 5</option><option value="6">Grade 6</option><option value="7">Grade 7</option>
+  </select>
+  <p class="hint" id="gradeHint">Choose the grade first (Grade R to Grade 7). The form then shows only the sections that apply to it.</p>
+  <div class="grid" style="margin-top:10px">
+    <div class="c4"><label for="year">Application year</label><input id="year" name="Year" type="number" min="2026" max="2100" value="2027"></div>
+  </div>
+</div>
+
+<p class="note">Complete the form in full. Completing it does not mean the learner has been accepted into the school.</p>
+
+<div id="formBody" class="hidden">
+
+<fieldset>
+  <legend>Learner details</legend>
+  <div class="grid">
+    <div class="c6"><label for="surname">Surname</label><input id="surname" name="Learner surname" type="text" required autocomplete="off"></div>
+    <div class="c3"><label for="initials">Initials</label><input id="initials" name="Learner initials" type="text"></div>
+    <div class="c3"><label for="nick">Nickname</label><input id="nick" name="Nickname" type="text"></div>
+    <div class="c6"><label for="first">First name</label><input id="first" name="Learner first name" type="text" required></div>
+    <div class="c6"><label for="other">Other names</label><input id="other" name="Other names" type="text"></div>
+    <div class="c6"><label for="dob">Date of birth</label><input id="dob" name="Date of birth" type="date" required></div>
+    <div class="c6">
+      <span class="lbl">Gender</span>
+      <div class="opts" role="radiogroup" aria-label="Gender" id="genderGrp">
+        <label><input type="radio" name="Gender" value="Male"> Male</label>
+        <label><input type="radio" name="Gender" value="Female"> Female</label>
+      </div>
+    </div>
+    <div class="c6"><label for="race">Race</label><input id="race" name="Race" type="text"></div>
+    <div class="c6"><label for="idno">Identification or passport no.</label><input id="idno" name="Learner ID / passport no." type="text" maxlength="20"></div>
+    <div class="c6"><label for="cor">Country of residence</label><input id="cor" name="Country of residence" type="text" value="South Africa"></div>
+    <div class="c6"><label for="citizen">Citizenship</label><input id="citizen" name="Citizenship" type="text"></div>
+    <div class="c12"><label for="prov">If South Africa, province of residence</label>
+      <select id="prov" name="Province of residence">
+        <option value="">Select province</option>
+        <option>Eastern Cape</option><option>Free State</option><option selected>Gauteng</option>
+        <option>KwaZulu-Natal</option><option>Limpopo</option><option>Mpumalanga</option>
+        <option>North West</option><option>Northern Cape</option><option>Western Cape</option>
+      </select>
+    </div>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Contact and home</legend>
+  <div class="grid">
+    <div class="c8"><label for="phys">Physical address</label><textarea id="phys" name="Physical address" required></textarea></div>
+    <div class="c4">
+      <label for="homeTel">Home telephone</label><input id="homeTel" name="Home telephone" type="tel">
+      <div style="height:8px"></div>
+      <label for="emTel">Emergency telephone</label><input id="emTel" name="Emergency telephone" type="tel" required>
+    </div>
+    <div class="c6"><label for="city">City / suburb</label><input id="city" name="City / suburb" type="text"></div>
+    <div class="c3"><label for="code">Code</label><input id="code" name="Postal code" type="text" inputmode="numeric" maxlength="4"></div>
+    <div class="c3"><label for="lcell">Learner cell</label><input id="lcell" name="Learner cell" type="tel"></div>
+    <div class="c12"><label for="lmail">Learner email address</label><input id="lmail" name="Learner email" type="email"></div>
+    <div class="c6"><label for="hl">Home language</label><input id="hl" name="Home language" type="text"></div>
+    <div class="c6"><label for="pl">Preferred language of instruction</label><input id="pl" name="Preferred language of instruction" type="text"></div>
+    <div class="c4"><span class="lbl">Boarder</span>
+      <div class="opts"><label><input type="radio" name="Boarder" value="Yes"> Yes</label><label><input type="radio" name="Boarder" value="No"> No</label></div></div>
+    <div class="c8"><span class="lbl">Deceased parent</span>
+      <div class="opts"><label><input type="checkbox" name="Deceased parent" value="Mother"> Mother</label><label><input type="checkbox" name="Deceased parent" value="Father"> Father</label><label><input type="checkbox" name="Deceased parent" value="Both"> Both</label></div></div>
+    <div class="c6"><label for="trans">Mode of transport</label><input id="trans" name="Mode of transport" type="text"></div>
+    <div class="c6"><label for="rel">Religion</label><input id="rel" name="Religion" type="text"></div>
+  </div>
+</fieldset>
+
+<!-- Grade 1 only -->
+<fieldset data-grades="1">
+  <legend>Grade 1 only: pre-primary education</legend>
+  <div class="opts"><label><input type="radio" name="Pre-primary" value="None"> None</label><label><input type="radio" name="Pre-primary" value="Non-formal"> Non-formal</label><label><input type="radio" name="Pre-primary" value="Formal"> Formal</label></div>
+</fieldset>
+
+<!-- Grades 2 to 7 -->
+<fieldset data-grades="2,3,4,5,6,7">
+  <legend>Previous school information</legend>
+  <div class="grid">
+    <div class="c6"><label for="highGrade">Highest grade passed</label>
+      <select id="highGrade" name="Highest grade passed"></select>
+      <p class="hint">Only grades below the grade applied for are listed.</p></div>
+    <div class="c6"><label for="yearPassed">Year grade was passed</label><input id="yearPassed" name="Year grade was passed" type="number" min="1990" max="2100"></div>
+    <div class="c12"><label for="ps">Name of previous school</label><input id="ps" name="Previous school" type="text"></div>
+    <div class="c12"><label for="psa">Previous school address</label><textarea id="psa" name="Previous school address"></textarea></div>
+    <div class="c4"><label for="psc">Code</label><input id="psc" name="Previous school code" type="text"></div>
+    <div class="c4"><label for="psp">Province</label><input id="psp" name="Previous school province" type="text"></div>
+    <div class="c4"><label for="psco">Country</label><input id="psco" name="Previous school country" type="text"></div>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Learner medical information</legend>
+  <div class="grid">
+    <div class="c6"><label for="man">Medical aid number</label><input id="man" name="Medical aid number" type="text"></div>
+    <div class="c6"><label for="mn">Medical aid name</label><input id="mn" name="Medical aid name" type="text"></div>
+    <div class="c6"><label for="mm">Medical aid main member</label><input id="mm" name="Medical aid main member" type="text"></div>
+    <div class="c6"><label for="dn">Doctor name</label><input id="dn" name="Doctor name" type="text"></div>
+    <div class="c6"><label for="da">Doctor's address</label><input id="da" name="Doctor's address" type="text"></div>
+    <div class="c6"><label for="dt">Doctor telephone number</label><input id="dt" name="Doctor telephone" type="tel"></div>
+    <div class="c12"><label for="mc">Medical condition</label><textarea id="mc" name="Medical condition"></textarea></div>
+    <div class="c12"><label for="sp">Special problems requiring counselling</label><textarea id="sp" name="Special problems requiring counselling"></textarea></div>
+    <div class="c6"><span class="lbl">Dexterity of learner</span>
+      <div class="opts"><label><input type="radio" name="Dexterity" value="Right handed"> Right handed</label><label><input type="radio" name="Dexterity" value="Left handed"> Left handed</label><label><input type="radio" name="Dexterity" value="Ambidextrous"> Ambidextrous</label></div></div>
+    <div class="c3"><span class="lbl">Registered for social grant</span>
+      <div class="opts"><label><input type="radio" name="Registered social grant" value="Yes"> Yes</label><label><input type="radio" name="Registered social grant" value="No"> No</label></div></div>
+    <div class="c3"><span class="lbl">Receiving social grant</span>
+      <div class="opts"><label><input type="radio" name="Receiving social grant" value="Yes"> Yes</label><label><input type="radio" name="Receiving social grant" value="No"> No</label></div></div>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Siblings</legend>
+  <div class="grid">
+    <div class="c6"><label for="sibN">Number of other children at this school</label><input id="sibN" name="Other children at this school" type="number" min="0"></div>
+    <div class="c6"><label for="pos">Position in the family (e.g. first)</label><input id="pos" name="Position in family" type="text"></div>
+  </div>
+  <p class="hint" style="margin:12px 0 4px">Full names of siblings at this school</p>
+  <div class="sib"><div><label for="s1">Name</label><input id="s1" name="Sibling 1 name" type="text"></div><div><label for="g1">Grade</label><input id="g1" name="Sibling 1 grade" type="text"></div></div>
+  <div class="sib"><div><label for="s2">Name</label><input id="s2" name="Sibling 2 name" type="text"></div><div><label for="g2">Grade</label><input id="g2" name="Sibling 2 grade" type="text"></div></div>
+  <div class="sib"><div><label for="s3">Name</label><input id="s3" name="Sibling 3 name" type="text"></div><div><label for="g3">Grade</label><input id="g3" name="Sibling 3 grade" type="text"></div></div>
+</fieldset>
+
+<fieldset>
+  <legend>Parent / guardian information</legend>
+  <p class="hint" style="margin:0 0 10px">Complete a separate parent form for each parent living at a different physical address.</p>
+  <div class="grid">
+    <div class="c3"><label for="ptitle">Title</label>
+      <select id="ptitle" name="Parent title"><option value=""></option><option>Mr</option><option>Mrs</option><option>Ms</option><option>Miss</option><option>Dr</option><option>Prof</option></select></div>
+    <div class="c3"><label for="pinit">Initials</label><input id="pinit" name="Parent initials" type="text"></div>
+    <div class="c6"><label for="psur">Surname</label><input id="psur" name="Parent surname" type="text" required></div>
+    <div class="c6"><label for="pfirst">First name</label><input id="pfirst" name="Parent first name" type="text" required></div>
+    <div class="c6"><span class="lbl">Gender</span>
+      <div class="opts"><label><input type="radio" name="Parent gender" value="Male"> Male</label><label><input type="radio" name="Parent gender" value="Female"> Female</label></div></div>
+    <div class="c6"><label for="phl">Home language</label><input id="phl" name="Parent home language" type="text"></div>
+    <div class="c6"><label for="prace">Race</label><input id="prace" name="Parent race" type="text"></div>
+    <div class="c6"><label for="pid">Identification or passport number</label><input id="pid" name="Parent ID / passport" type="text" maxlength="20" required></div>
+    <div class="c6"><span class="lbl">Account payer</span>
+      <div class="opts"><label><input type="radio" name="Account payer" value="Yes"> Yes</label><label><input type="radio" name="Account payer" value="No"> No</label></div></div>
+    <div class="c12"><label for="pres">Residential street address</label><input id="pres" name="Parent residential address" type="text"></div>
+    <div class="c8"><label for="pcity">City / suburb</label><input id="pcity" name="Parent city / suburb" type="text"></div>
+    <div class="c4"><label for="pcode">Code</label><input id="pcode" name="Parent code" type="text" inputmode="numeric" maxlength="4"></div>
+    <div class="c6"><label for="pocc">Occupation</label><input id="pocc" name="Parent occupation" type="text"></div>
+    <div class="c6"><label for="pemp">Employer</label><input id="pemp" name="Parent employer" type="text"></div>
+    <div class="c6"><label for="ssur">Surname of spouse</label><input id="ssur" name="Spouse surname" type="text"></div>
+    <div class="c6"><label for="sfirst">Spouse first name</label><input id="sfirst" name="Spouse first name" type="text"></div>
+    <div class="c6"><label for="socc">Occupation of spouse</label><input id="socc" name="Spouse occupation" type="text"></div>
+    <div class="c6"><span class="lbl">Learner resides with this parent/s</span>
+      <div class="opts"><label><input type="radio" name="Learner resides with parent" value="Yes"> Yes</label><label><input type="radio" name="Learner resides with parent" value="No"> No</label></div></div>
+    <div class="c6"><label for="sid">Spouse ID number</label><input id="sid" name="Spouse ID" type="text" maxlength="20"></div>
+    <div class="c6"><label for="prel">Relationship to learner</label><input id="prel" name="Relationship to learner" type="text"></div>
+    <div class="c6"><label for="pmar">Marital status of parent</label>
+      <select id="pmar" name="Marital status"><option value=""></option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option><option>Living together</option></select></div>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Correspondence and contact details</legend>
+  <div class="grid">
+    <div class="c4"><label for="ctitle">Title</label><input id="ctitle" name="Correspondence title" type="text"></div>
+    <div class="c8"><label for="csur">Surname</label><input id="csur" name="Correspondence surname" type="text"></div>
+    <div class="c12"><label for="post">Postal address</label><input id="post" name="Postal address" type="text"></div>
+    <div class="c8"><label for="pocity">City / suburb</label><input id="pocity" name="Postal city / suburb" type="text"></div>
+    <div class="c4"><label for="pocode">Code</label><input id="pocode" name="Postal code (parent)" type="text" inputmode="numeric" maxlength="4"></div>
+    <div class="c6"><label for="pht">Home telephone</label><input id="pht" name="Parent home telephone" type="tel"></div>
+    <div class="c6"><label for="pwt">Work telephone</label><input id="pwt" name="Parent work telephone" type="tel"></div>
+    <div class="c6"><label for="pfax">Fax number</label><input id="pfax" name="Fax number" type="tel"></div>
+    <div class="c6"><label for="pcell">Cell number</label><input id="pcell" name="Parent cell" type="tel" required></div>
+    <div class="c6"><label for="swt">Spouse work telephone number</label><input id="swt" name="Spouse work telephone" type="tel"></div>
+    <div class="c6"><label for="scell">Spouse cell number</label><input id="scell" name="Spouse cell" type="tel"></div>
+    <div class="c6"><label for="pmail">Email address</label><input id="pmail" name="Parent email" type="email" required></div>
+    <div class="c6"><label for="smail">Spouse email address</label><input id="smail" name="Spouse email" type="email"></div>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend>Declaration</legend>
+  <div class="opts" style="padding:0 0 10px"><label><input type="checkbox" id="decl"> I declare that, to the best of my knowledge, the information supplied above is accurate and correct.</label></div>
+  <div class="grid">
+    <div class="c8"><label for="dname">Name of parent / guardian (please print)</label><input id="dname" name="Declaration name" type="text" required></div>
+    <div class="c4"><label for="ddate">Date</label><input id="ddate" name="Declaration date" type="date" required></div>
+  </div>
+</fieldset>
+
+<fieldset class="office">
+  <legend>Office use only</legend>
+  <p class="hint" style="margin:0">The school completes this section. The accession number is filled in when the application is accepted.</p>
+</fieldset>
+
+<p class="err" id="err" role="alert"></p>
+<div class="actions">
+  <button type="button" class="primary" id="apply">Apply and continue to documents</button>
+  <button type="reset" class="secondary">Clear form</button>
+</div>
+
+</div><!-- /formBody -->
+</form>
+</section>
+
+<!-- STEP 2 -->
+<section id="step2" class="hidden">
+  <p class="note">Upload each required document as a PDF or a clear photo (JPG or PNG, up to 5 MB each). Every item must have at least one file before you can submit.</p>
+  <div id="docList"></div>
+  <p class="err" id="err2" role="alert"></p>
+  <div class="actions">
+    <button type="button" class="secondary" id="back">Back to form</button>
+    <button type="button" class="primary" id="submitApp" disabled>Submit application</button>
+  </div>
+</section>
+
+<!-- STEP 3 -->
+<section id="step3" class="hidden">
+  <div class="profile" id="profile"></div>
+  <div class="actions noprint">
+    <button type="button" class="primary" id="dlJson">Download profile (JSON)</button>
+    <button type="button" class="secondary" id="dlCsv">Download profile (CSV)</button>
+    <button type="button" class="secondary" id="print">Print or save as PDF</button>
+    <button type="button" class="secondary" id="newApp">Start another application</button>
+  </div>
+</section>
+
+<details class="saved noprint" id="savedBox">
+  <summary id="savedSum">Saved learner profiles</summary>
+  <ul id="savedList" style="list-style:none;padding:0;margin:8px 0 0"></ul>
+  <p class="hint">Profiles are stored in this browser on this device. Download a profile to keep a copy elsewhere.</p>
+</details>
+
+</div>
+
+<script>
+/* ---------- storage (browser storage if available, memory otherwise) ---------- */
+const KEY = 'nwamhinga:learners';
+let memStore = [];
+function loadAll(){
+  try{ const raw = window.localStorage.getItem(KEY); return raw ? JSON.parse(raw) : memStore; }
+  catch(e){ return memStore; }
+}
+function saveAll(list){
+  memStore = list;
+  try{ window.localStorage.setItem(KEY, JSON.stringify(list)); return true; }
+  catch(e){ return false; }
+}
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const form = $('f');
+const DOCS = [
+  {key:'certified', label:'Certified copies', hint:'Certified copies of the supporting documents (certified within the last 3 months).'},
+  {key:'birth', label:'Birth certificate', hint:'Learner\'s birth certificate.'},
+  {key:'clinic', label:'Clinic book / card (pages 2 to 7)', hint:'Photograph or scan pages 2 to 7. You can add several files.'},
+  {key:'residence', label:'Proof of residence', hint:'A recent utility bill, lease or a letter from the ward councillor.'},
+  {key:'parentId', label:'Parents\' IDs', hint:'ID copy of each parent / guardian. You can add several files.'}
+];
+const MAX = 5 * 1024 * 1024;
+const files = {}; DOCS.forEach(d => files[d.key] = []);
+let record = null;
+
+function showStep(n){
+  ['step1','step2','step3'].forEach((id,i)=> $(id).classList.toggle('hidden', i !== n-1));
+  [...$('steps').children].forEach((li,i)=>{
+    li.className = i === n-1 ? 'on' : (i < n-1 ? 'done' : '');
+  });
+  window.scrollTo({top:0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+}
+
+/* ---------- grade filtering ---------- */
+function applyGrade(){
+  const g = $('gradeFor').value;
+  $('formBody').classList.toggle('hidden', !g);
+  document.querySelectorAll('[data-grades]').forEach(el=>{
+    const show = g && el.dataset.grades.split(',').includes(g);
+    el.classList.toggle('hidden', !show);
+    el.querySelectorAll('input,select,textarea').forEach(i => i.disabled = !show);
+  });
+  const hg = $('highGrade');
+  hg.replaceChildren();
+  if(g && +g >= 2){
+    hg.add(new Option('Select', ''));
+    hg.add(new Option('Grade R', 'Grade R'));
+    for(let i = 1; i < +g; i++) hg.add(new Option('Grade ' + i, 'Grade ' + i));
+  }
+  $('gradeHint').textContent = !g
+    ? 'Choose the grade first (Grade R to Grade 7). The form then shows only the sections that apply to it.'
+    : (g === 'R'
+      ? 'Grade R: previous school and pre-primary sections are not needed.'
+      : +g === 1
+      ? 'Grade 1: the pre-primary education section is shown. Previous school details are not needed.'
+      : 'Grade ' + g + ': previous school details are shown, and the highest grade passed lists Grade R to Grade ' + (+g - 1) + '.');
+}
+$('gradeFor').addEventListener('change', applyGrade);
+form.addEventListener('reset', () => setTimeout(applyGrade, 0));
+applyGrade();
+
+/* ---------- step 1: validate and apply ---------- */
+function labelOf(el){
+  const l = el.id && document.querySelector('label[for="' + el.id + '"]');
+  return l ? l.textContent : el.name;
+}
+function collect(){
+  const out = {};
+  new FormData(form).forEach((v,k)=>{
+    if(!String(v).trim()) return;
+    out[k] = out[k] ? out[k] + ', ' + v : v;
+  });
+  return out;
+}
+$('apply').addEventListener('click', () => {
+  form.querySelectorAll('.invalid').forEach(e => e.classList.remove('invalid'));
+  const problems = [];
+  form.querySelectorAll('[required]').forEach(el=>{
+    if(el.disabled) return;
+    if(!el.value.trim()){ el.classList.add('invalid'); problems.push(el); }
+    else if(el.type === 'email' && !/^\S+@\S+\.\S+$/.test(el.value)){ el.classList.add('invalid'); problems.push(el); }
+  });
+  const genderOk = form.querySelector('input[name="Gender"]:checked');
+  const names = problems.map(labelOf);
+  if(!genderOk) names.push('Learner gender');
+  if(!$('decl').checked) names.push('Declaration tick box');
+  if(names.length){
+    $('err').style.display = 'block';
+    $('err').textContent = 'Complete these before continuing: ' + names.join(', ') + '.';
+    (problems[0] || (!genderOk ? form.querySelector('input[name="Gender"]') : $('decl'))).focus();
+    return;
+  }
+  $('err').style.display = 'none';
+  renderDocs();
+  showStep(2);
+});
+
+/* ---------- step 2: documents ---------- */
+function renderDocs(){
+  const host = $('docList'); host.replaceChildren();
+  DOCS.forEach((d,i)=>{
+    const box = document.createElement('div'); box.className = 'doc' + (files[d.key].length ? ' ok' : '');
+    const h = document.createElement('h3'); h.textContent = (i+1) + '. ' + d.label + (files[d.key].length ? '  \u2713' : '');
+    const p = document.createElement('p'); p.className = 'hint'; p.textContent = d.hint;
+    const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true;
+    inp.accept = '.pdf,image/jpeg,image/png'; inp.setAttribute('aria-label', 'Upload ' + d.label);
+    inp.addEventListener('change', () => {
+      $('err2').style.display = 'none';
+      [...inp.files].forEach(f=>{
+        if(f.size > MAX){ $('err2').style.display = 'block'; $('err2').textContent = f.name + ' is larger than 5 MB. Compress it or take a smaller photo.'; return; }
+        if(!/pdf|jpeg|png/.test(f.type)){ $('err2').style.display = 'block'; $('err2').textContent = f.name + ' is not a PDF, JPG or PNG file.'; return; }
+        files[d.key].push(f);
+      });
+      renderDocs();
+    });
+    const ul = document.createElement('ul');
+    files[d.key].forEach((f,idx)=>{
+      const li = document.createElement('li');
+      const s = document.createElement('span'); s.textContent = f.name + ' (' + Math.max(1, Math.round(f.size/1024)) + ' KB)';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'secondary'; b.textContent = 'Remove';
+      b.addEventListener('click', ()=>{ files[d.key].splice(idx,1); renderDocs(); });
+      li.append(s,b); ul.append(li);
+    });
+    box.append(h,p,inp,ul); host.append(box);
+  });
+  $('submitApp').disabled = !DOCS.every(d => files[d.key].length);
+}
+$('back').addEventListener('click', () => showStep(1));
+
+const toDataUrl = f => new Promise((res,rej)=>{ const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+
+/* ---------- step 3: create profile ---------- */
+$('submitApp').addEventListener('click', async () => {
+  $('submitApp').disabled = true;
+  const data = collect();
+  const docs = {};
+  for(const d of DOCS){
+    docs[d.label] = [];
+    for(const f of files[d.key]){
+      docs[d.label].push({name:f.name, type:f.type, sizeKB:Math.round(f.size/1024), dataUrl: await toDataUrl(f)});
+    }
+  }
+  const year = data['Year'] || new Date().getFullYear();
+  const ref = 'NMP-' + year + '-' + String(Math.floor(10000 + Math.random()*90000));
+  record = {
+    reference: ref,
+    status: 'Saved on this device — not yet sent to school',
+    submittedAt: new Date().toISOString(),
+    learner: {
+      fullName: ((data['Learner first name']||'') + ' ' + (data['Learner surname']||'')).trim(),
+      gradeAppliedFor: 'Grade ' + data['Grade applied for'],
+      dateOfBirth: data['Date of birth'] || ''
+    },
+    application: data,
+    documents: docs
+  };
+  const list = loadAll(); list.push(slim(record));
+  const stored = saveAll(list);
+  renderProfile(record, stored);
+  renderSaved();
+  showStep(3);
+});
+
+// Stored copy keeps the form data and document names; file contents stay in the downloaded JSON.
+function slim(r){
+  const c = JSON.parse(JSON.stringify(r));
+  Object.keys(c.documents).forEach(k => c.documents[k] = c.documents[k].map(({name,type,sizeKB}) => ({name,type,sizeKB})));
+  return c;
+}
+
+function section(title, pairs){
+  const frag = document.createDocumentFragment();
+  const h = document.createElement('h3'); h.textContent = title; frag.append(h);
+  const dl = document.createElement('dl'); dl.className = 'kv';
+  pairs.forEach(([k,v])=>{ if(!v) return;
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt,dd); });
+  frag.append(dl); return frag;
+}
+function renderProfile(r, stored){
+  const a = r.application, p = $('profile'); p.replaceChildren();
+  const h = document.createElement('h2'); h.textContent = 'Learner profile: ' + r.learner.fullName;
+  const ref = document.createElement('div'); ref.className = 'ref'; ref.textContent = 'Reference ' + r.reference;
+  const st = document.createElement('p'); st.style.margin = '0';
+  st.textContent = r.status + '. Submitted ' + new Date(r.submittedAt).toLocaleString() + '. Keep the reference number for school queries.';
+  p.append(h, ref, st);
+  p.append(section('Admission', [['Grade applied for', r.learner.gradeAppliedFor], ['Application year', a['Year']], ['Highest grade passed', a['Highest grade passed']], ['Year grade was passed', a['Year grade was passed']], ['Pre-primary education', a['Pre-primary']]]));
+  p.append(section('Learner', [['Surname', a['Learner surname']], ['First name', a['Learner first name']], ['Other names', a['Other names']], ['Nickname', a['Nickname']], ['Date of birth', a['Date of birth']], ['Gender', a['Gender']], ['Race', a['Race']], ['ID / passport', a['Learner ID / passport no.']], ['Citizenship', a['Citizenship']], ['Province', a['Province of residence']], ['Home language', a['Home language']], ['Religion', a['Religion']], ['Physical address', a['Physical address']], ['Emergency telephone', a['Emergency telephone']]]));
+  p.append(section('Previous school', [['School', a['Previous school']], ['Address', a['Previous school address']]]));
+  p.append(section('Medical', [['Medical aid', a['Medical aid name']], ['Medical aid number', a['Medical aid number']], ['Doctor', a['Doctor name']], ['Doctor telephone', a['Doctor telephone']], ['Medical condition', a['Medical condition']], ['Counselling needs', a['Special problems requiring counselling']], ['Dexterity', a['Dexterity']]]));
+  p.append(section('Parent / guardian', [['Name', ((a['Parent title']||'') + ' ' + (a['Parent first name']||'') + ' ' + (a['Parent surname']||'')).trim()], ['Relationship', a['Relationship to learner']], ['ID / passport', a['Parent ID / passport']], ['Cell', a['Parent cell']], ['Email', a['Parent email']], ['Account payer', a['Account payer']], ['Address', a['Parent residential address']]]));
+  p.append(section('Documents received', Object.entries(r.documents).map(([k,v]) => [k, v.map(f => f.name).join(', ')])));
+  const note = document.createElement('p'); note.className = 'hint noprint';
+  note.textContent = stored ? 'This profile is saved in this browser. Download a copy to keep it safe.' : 'This browser blocked saving, so the profile is only kept while this page is open. Download it now.';
+  p.append(note);
+}
+
+/* ---------- downloads ---------- */
+function download(name, text, mime){
+  const url = URL.createObjectURL(new Blob([text], {type:mime}));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+function toCsv(r){
+  const esc = s => '"' + String(s).replace(/"/g,'""') + '"';
+  const rows = [['Field','Value'], ['Reference', r.reference], ['Status', r.status], ['Submitted', r.submittedAt]]
+    .concat(Object.entries(r.application))
+    .concat(Object.entries(r.documents).map(([k,v]) => ['Document: ' + k, v.map(f=>f.name).join('; ')]));
+  return rows.map(x => x.map(esc).join(',')).join('\r\n');
+}
+$('dlJson').addEventListener('click', () => download(record.reference + '.json', JSON.stringify(record, null, 2), 'application/json'));
+$('dlCsv').addEventListener('click', () => download(record.reference + '.csv', toCsv(record), 'text/csv'));
+$('print').addEventListener('click', () => window.print());
+$('newApp').addEventListener('click', () => {
+  form.reset(); DOCS.forEach(d => files[d.key] = []); record = null; applyGrade(); showStep(1);
+});
+
+/* ---------- saved profiles ---------- */
+function renderSaved(){
+  const list = loadAll(); const ul = $('savedList'); ul.replaceChildren();
+  $('savedSum').textContent = 'Saved learner profiles (' + list.length + ')';
+  list.slice().reverse().forEach(r=>{
+    const li = document.createElement('li');
+    const s = document.createElement('span'); s.textContent = r.reference + ' \u2013 ' + r.learner.fullName + ', ' + r.learner.gradeAppliedFor;
+    const box = document.createElement('span');
+    const j = document.createElement('button'); j.type = 'button'; j.className = 'secondary'; j.textContent = 'JSON';
+    j.addEventListener('click', () => download(r.reference + '.json', JSON.stringify(r, null, 2), 'application/json'));
+    const c = document.createElement('button'); c.type = 'button'; c.className = 'secondary'; c.textContent = 'CSV';
+    c.addEventListener('click', () => download(r.reference + '.csv', toCsv(r), 'text/csv'));
+    const v = document.createElement('button'); v.type = 'button'; v.className = 'secondary'; v.textContent = 'View';
+    v.addEventListener('click', () => { record = r; renderProfile(r, true); showStep(3); });
+    box.append(v, ' ', j, ' ', c); li.append(s, box); ul.append(li);
+  });
+}
+renderSaved();
+</script>
+</body>
+</html>

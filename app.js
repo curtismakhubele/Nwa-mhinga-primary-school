@@ -59,7 +59,7 @@ function login(){
  <div class="field"><label>Username / Email</label><input id="email" class="input" value="admin@nwamhingap.co.za"></div>
  <div class="field"><label>Password</label><input id="password" class="input" type="password" value="Admin@123"></div>
  <button class="btn btn-primary btn-full" onclick="doLogin()">Login</button>
- <div style="text-align:center;margin-top:12px"><button class="btn btn-soft" onclick="forgot()">Forgot Password?</button></div>
+ <div class="admissions-entry"><a class="btn btn-blue btn-full" href="./admissions.html">Apply for Admission</a><button class="btn btn-soft btn-full" onclick="forgot()">Forgot Password?</button><p class="muted">New learners can start an application without signing in.</p></div>
  <div class="demo-box"><b>Demo accounts</b><br>Admin: admin@nwamhingap.co.za / Admin@123<br>Principal: principal@nwamhingap.co.za / Principal@123<br>Teacher: teacher3@nwamhingap.co.za / Teacher@123<br>Parent: parent@nwamhingap.co.za / Parent@123<br>Learner: learner@nwamhingap.co.za / Learner@123</div>
  </div></section></div>`;
 }
@@ -89,7 +89,7 @@ function title(p){return ({dashboard:"Dashboard",users:"User & Access Management
 function render(page="dashboard"){
  if(!can(page))page="dashboard";
  const u=me(), nav=[
-  ["dashboard","⌂","Dashboard"],["classes","▦","My Classes"],["attendance","◷","Staff Attendance"],["learners","♟","Learners"],["assessments","▣","Assessments"],["reports","▤","Reports"],["upload","⇧","Upload Data"],["backup","☁","Cloud Backup"],["users","♙","Users & Access"],["settings","⚙","Settings"]
+  ["dashboard","⌂","Dashboard"],["classes","▦","My Classes"],["attendance","◷","Staff Attendance"],["learners","♟","Learners"],["assessments","▣","Assessments"],["reports","▤","Reports"],["upload","⇧","Upload Data"],["media","▧","Media & Lessons"],["admissions","▣","Admissions Inbox"],["backup","☁","Cloud Backup"],["users","♙","Users & Access"],["settings","⚙","Settings"]
  ];
  document.getElementById("app").innerHTML=`<div class="shell"><aside class="sidebar" id="side">
  <div class="side-head"><img class="logo-exact side-logo" src="nwa-mhinga-p-logo.png" alt="N'WA MHINGA P logo"><div class="side-title">N'WA MHINGA P<small>School Data Management</small></div></div>
@@ -106,10 +106,10 @@ function pageHTML(p){
 }
 function dashboard(){
  const u=me(), ls=assignedLearners(), n=ls.length;
- let cards=stat("♟","Total Learners",n,u.role==="Teacher"?"Your assigned learners":"School/assigned learners")+stat("▦","My Classes",classesForUser().length,"Assigned classes")+stat("▣","Assessments",db.assessments.filter(a=>ls.some(l=>l.id===a.learnerId)).length,"Available records")+stat("☁","Last Backup",db.backup.last,"Cloud protection");
+ let cards=stat("♟","Total Learners",n,u.role==="Teacher"?"Your assigned learners":"School/assigned learners")+stat("▦","My Classes",classesForUser().length,"Assigned classes")+stat("▣","Assessments",db.assessments.filter(a=>ls.some(l=>l.id===a.learnerId)).length,"Available records")+stat("☁","Last Backup",db.backup.last,"Azure storage not connected");
  return `<div class="page-title"><div><h1>Dashboard</h1><div class="muted">Welcome, ${esc(u.name)}</div></div><div class="actions">${u.role==="Admin"?`<button class="btn btn-primary" onclick="openUser()">+ Create User</button>`:""}<button class="btn btn-blue" onclick="render('upload')">Upload Data</button></div></div>
  <div class="cards">${cards}</div><div class="grid2"><div class="card"><div class="section-title"><h3>Class Overview</h3><span class="muted">${esc(u.role)} access</span></div><div class="grade-grid">${["R",1,2,3,4,5,6,7].map((g,i)=>{let grade="Grade "+g, a=ls.filter(l=>l.grade===grade);return `<div class="grade-card g${i+1}"><h3>${grade}</h3><strong>${a.length}</strong><small>learners</small></div>`}).join("")}</div></div>
- <div class="card"><div class="section-title"><h3>Recent Activity</h3><button class="btn btn-soft" onclick="render('reports')">View All</button></div><p><span class="badge blue">Academic</span> Grade 3 English marks uploaded.</p><p><span class="badge">Backup</span> Cloud backup completed.</p><p><span class="badge">Access</span> User permissions enforced by role.</p><p><span class="badge gold">System</span> Password management available.</p></div></div>
+ <div class="card"><div class="section-title"><h3>Recent Activity</h3><button class="btn btn-soft" onclick="render('reports')">View All</button></div><p><span class="badge blue">Academic</span> Grade 3 English marks uploaded.</p><p><span class="badge gold">Backup</span> Azure storage not connected.</p><p><span class="badge">Access</span> User permissions enforced by role.</p><p><span class="badge gold">System</span> Password management available.</p></div></div>
  <div class="grid3"><div class="card"><h3>Access control</h3><p class="muted">Teachers see only their assigned grade/class. Parents and learners see only linked learner information.</p></div><div class="card"><h3>Cloud backup</h3><p class="muted">School records are prepared for automatic encrypted cloud backup and restore.</p></div><div class="card"><h3>Security</h3><p class="muted">Admin assigns roles, credentials, grade/class access and account status.</p></div></div>`;
 }
 function classesForUser(){
