@@ -105,12 +105,30 @@ function pageHTML(p){
  if(p==="assessments")return assessments(); if(p==="reports")return reports(); if(p==="upload")return upload(); if(p==="backup")return backup(); if(p==="attendance")return staffAttendancePage(); return settings();
 }
 function dashboard(){
- const u=me(), ls=assignedLearners(), n=ls.length;
- let cards=stat("♟","Total Learners",n,u.role==="Teacher"?"Your assigned learners":"School/assigned learners")+stat("▦","My Classes",classesForUser().length,"Assigned classes")+stat("▣","Assessments",db.assessments.filter(a=>ls.some(l=>l.id===a.learnerId)).length,"Available records")+stat("☁","Last Backup",db.backup.last,"Azure storage not connected");
- return `<div class="page-title"><div><h1>Dashboard</h1><div class="muted">Welcome, ${esc(u.name)}</div></div><div class="actions">${u.role==="Admin"?`<button class="btn btn-primary" onclick="openUser()">+ Create User</button>`:""}<button class="btn btn-blue" onclick="render('upload')">Upload Data</button></div></div>
- <div class="cards">${cards}</div><div class="grid2"><div class="card"><div class="section-title"><h3>Class Overview</h3><span class="muted">${esc(u.role)} access</span></div><div class="grade-grid">${["R",1,2,3,4,5,6,7].map((g,i)=>{let grade="Grade "+g, a=ls.filter(l=>l.grade===grade);return `<div class="grade-card g${i+1}"><h3>${grade}</h3><strong>${a.length}</strong><small>learners</small></div>`}).join("")}</div></div>
- <div class="card"><div class="section-title"><h3>Recent Activity</h3><button class="btn btn-soft" onclick="render('reports')">View All</button></div><p><span class="badge blue">Academic</span> Grade 3 English marks uploaded.</p><p><span class="badge gold">Backup</span> Azure storage not connected.</p><p><span class="badge">Access</span> User permissions enforced by role.</p><p><span class="badge gold">System</span> Password management available.</p></div></div>
- <div class="grid3"><div class="card"><h3>Access control</h3><p class="muted">Teachers see only their assigned grade/class. Parents and learners see only linked learner information.</p></div><div class="card"><h3>Cloud backup</h3><p class="muted">School records are prepared for automatic encrypted cloud backup and restore.</p></div><div class="card"><h3>Security</h3><p class="muted">Admin assigns roles, credentials, grade/class access and account status.</p></div></div>`;
+ const u=me(), ls=assignedLearners(), scopedMarks=db.assessments.filter(a=>ls.some(l=>l.id===a.learnerId));
+ const teachers=db.users.filter(x=>x.role==="Teacher"&&x.status==="Active").length;
+ const mediaCount=(window.dashboardPostCount?window.dashboardPostCount():0);
+ const termNames=["Term 1","Term 2","Term 3","Term 4"];
+ const averages=termNames.map(t=>{const marks=scopedMarks.filter(a=>a.term===t);return marks.length?Math.round(marks.reduce((sum,a)=>sum+Number(a.mark||0),0)/marks.length):null});
+ const shown=averages.map((v,i)=>v===null?null:{x:54+i*115,y:153-(v*1.28),v}).filter(Boolean);
+ const chartLine=shown.length>1?shown.map((p,i)=>(i?"L":"M")+p.x+" "+p.y).join(" "):"";
+ const chartDots=shown.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="5" fill="#fff" stroke="#7658bb" stroke-width="3"><title>${p.v}%</title></circle>`).join("");
+ const updateCards=window.dashboardPosts?window.dashboardPosts():"<p class='empty'>School news and lessons will appear here.</p>";
+ return `<div class="dash-welcome"><div class="dash-welcome-copy"><span class="dash-eyebrow">N’WA MHINGA PRIMARY · ${esc(u.role)}</span><h1>Learning grows here.</h1><p>Welcome back, ${esc(u.name)}. Catch up on classes, learning resources and school updates.</p><div class="dash-actions"><button class="btn btn-warm" onclick="render('media')">Explore learning</button><button class="btn btn-glass" onclick="render('reports')">View reports</button></div></div><div class="dash-welcome-art" aria-hidden="true"><span class="art-sun"></span><span class="art-book">✦</span><span class="art-leaf">⌁</span></div></div>
+ <div class="dash-stats">${[
+   ["♟","Learners",ls.length,u.role==="Teacher"?"In your assigned class":"In your access scope","violet"],
+   ["♙","Teachers",teachers,"Active staff accounts","gold"],
+   ["▦","My classes",classesForUser().length,"Assigned learning groups","blue"],
+   ["▤","Learning resources",mediaCount,"News, lessons & media","green"]
+ ].map(c=>`<article class="dash-stat"><span class="dash-stat-icon ${c[4]}">${c[0]}</span><div><span>${c[1]}</span><strong>${c[2]}</strong><small>${c[3]}</small></div></article>`).join("")}</div>
+ <div class="dash-main-grid"><section class="card dash-performance"><div class="section-title"><div><h3>Learning performance</h3><span class="muted">Assessment average by term</span></div><button class="btn btn-soft" onclick="render('assessments')">View marks</button></div>${shown.length?`<div class="performance-chart"><div class="chart-y-labels"><span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span></div><svg viewBox="0 0 410 170" role="img" aria-label="Assessment average by term"><path d="M24 25H400 M24 62H400 M24 99H400 M24 136H400 M24 153H400" stroke="#e9e8f1" stroke-width="1" fill="none"/>${shown.length>1?`<path d="${chartLine}" fill="none" stroke="#7658bb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`:""}${chartDots}</svg><div class="chart-x-labels">${termNames.map((t,i)=>`<span>${t}${averages[i]===null?"":" · "+averages[i]+"%"}</span>`).join("")}</div></div>`:`<div class="empty dash-empty">Marks will appear here when assessments are captured.</div>`}<div class="dash-footnote">${scopedMarks.length} assessment${scopedMarks.length===1?"":"s"} in your access scope</div></section>
+ <section class="card dash-updates"><div class="section-title"><div><h3>School updates</h3><span class="muted">Announcements, lessons and media</span></div><button class="btn btn-soft" onclick="render('media')">See all</button></div><div id="dashboardNews" class="dashboard-news">${updateCards}</div></section></div>
+ <div class="dash-bottom-grid"><section class="card"><div class="section-title"><div><h3>Class overview</h3><span class="muted">Learners in your access scope</span></div><button class="btn btn-soft" onclick="render('classes')">My classes</button></div><div class="grade-grid">${["R",1,2,3,4,5,6,7].map((g,i)=>{let grade="Grade "+g, a=ls.filter(l=>l.grade===grade);return `<button class="grade-card g${i+1}" onclick="render('classes')"><h3>${grade}</h3><strong>${a.length}</strong><small>learners</small></button>`}).join("")}</div></section>
+ <section class="card dash-shortcuts"><div class="section-title"><div><h3>Quick access</h3><span class="muted">Your school workspace</span></div></div>${[
+   ["learners","♟","Learner records","Open learner details"],
+   ["attendance","◷","Attendance","View staff attendance"],
+   ["admissions","▣","Admissions","Review applications"]
+ ].filter(item=>can(item[0])).map(item=>`<button onclick="render('${item[0]}')"><span>${item[1]}</span><span><b>${item[2]}</b><small>${item[3]}</small></span><i>›</i></button>`).join("")}</section></div>`;
 }
 function classesForUser(){
  const u=me(); if(["Admin","Principal"].includes(u.role))return ["Grade R","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7"];
@@ -189,3 +207,4 @@ function uploadFile(){let f=upFile.files[0];if(!f)return toast("Select a file");
 function runBackup(){db.backup={last:"Today, "+new Date().toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"}),status:"Completed",used:"2.5 GB / 10 GB",percent:83};save();render("backup");toast("Cloud backup completed")}
 function saveSettings(){db.school.name=schoolName.value||db.school.name;db.school.motto=schoolMotto.value||db.school.motto;save();toast("Settings saved");render("settings")}
 login();
+
