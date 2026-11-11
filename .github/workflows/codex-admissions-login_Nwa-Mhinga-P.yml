@@ -1,0 +1,36 @@
+name: Deploy school portal to Azure
+
+on:
+  push:
+    branches:
+      - codex/admissions-login
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+
+      - name: Log in to Azure with GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: f34c1dd5-5cc7-4d4f-b6bf-b9b3861d9f5d
+          tenant-id: ca9a8b8c-3ea3-4799-a43e-5510398e7a3b
+          subscription-id: 673e191b-c929-489b-9843-81abef0b119e
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: Nwa-Mhinga-P
+          package: .

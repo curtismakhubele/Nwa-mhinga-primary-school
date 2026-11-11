@@ -1,0 +1,197 @@
+"use strict";
+const express = require("express");
+const helmet = require("helmet");
+const multer = require("multer");
+const crypto = require("node:crypto");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+
+const app = express();
+const port = Number(process.env.PORT || 8080);
+const siteRoot = __dirname;
+const dataRoot = process.env.SCHOOL_DATA_DIR || path.join(siteRoot, ".school-data");
+const mediaRoot = path.join(dataRoot, "school-media");
+const statePath = path.join(dataRoot, "school-content.json");
+const maximumFileBytes = 50 * 1024 * 1024;
+const totalMediaLimitBytes = Number(process.env.SCHOOL_MEDIA_LIMIT_BYTES || 600 * 1024 * 1024);
+const sessionLifetimeMs = 8 * 60 * 60 * 1000;
+const sessions = new Map();
+const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "application/pdf"]);
+let state = { items: [] };
+let writeQueue = Promise.resolve();
+
+app.disable("x-powered-by");
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      mediaSrc: ["'self'", "https:"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"]
+    }
+  }
+}));
+app.use(express.json({ limit: "2mb" }));
+
+function sendError(res, status, message) {
+  return res.status(status).json({ error: message });
+}
+function cookieValue(req, name) {
+  const header = req.headers.cookie || "";
+  const match = header.split(";").map(x => x.trim()).find(x => x.startsWith(name + "="));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : "";
+}
+function currentAdmin(req) {
+  const token = cookieValue(req, "nwa_admin_session");
+  const entry = sessions.get(token);
+  if (!entry || entry.expiresAt < Date.now()) {
+    if (token) sessions.delete(token);
+    return null;
+  }
+  entry.expiresAt = Date.now() + sessionLifetimeMs;
+  return entry;
+}
+function requireAdmin(req, res, next) {
+  if (!currentAdmin(req)) return sendError(res, 401, "Administrator sign-in required.");
+  next();
+}
+async function saveState() {
+  writeQueue = writeQueue.then(async () => {
+    const tmp = statePath + ".tmp";
+    await fs.writeFile(tmp, JSON.stringify(state, null, 2), { mode: 0o600 });
+    await fs.rename(tmp, statePath);
+  });
+  return writeQueue;
+}
+async function directoryBytes(dir) {
+  let total = 0;
+  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const stat = await fs.stat(path.join(dir, entry.name));
+    total += stat.size;
+  }
+  return total;
+}
+function safePublicItem(item) {
+  const { id, type, title, description, filename, mimeType, size, createdAt, published } = item;
+  return { id, type, title, description, filename, mimeType, size, createdAt, published, fileUrl: item.filename ? "/api/media/" + encodeURIComponent(id) : "" };
+}
+
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: maximumFileBytes, files: 1, fields: 8, fieldSize: 16 * 1024 }
+});
+
+app.get("/api/health", (_req, res) => res.json({ status: "ok", storageLimitBytes: totalMediaLimitBytes }));
+app.get("/api/admin/session", (req, res) => {
+  const admin = currentAdmin(req);
+  res.json({ authenticated: !!admin, email: admin?.email || null });
+});
+app.post("/api/admin/login", (req, res) => {
+  const configuredEmail = (process.env.SCHOOL_ADMIN_EMAIL || "").trim().toLowerCase();
+  const configuredPassword = process.env.SCHOOL_ADMIN_PASSWORD || "";
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  if (!configuredEmail || !configuredPassword) {
+    return sendError(res, 503, "Admin sign-in is not configured. Set SCHOOL_ADMIN_EMAIL and SCHOOL_ADMIN_PASSWORD in App Service settings.");
+  }
+  const provided = Buffer.from(password);
+  const expected = Buffer.from(configuredPassword);
+  const equalPassword = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+  if (email !== configuredEmail || !equalPassword) return sendError(res, 401, "Invalid administrator credentials.");
+  const token = crypto.randomBytes(32).toString("base64url");
+  sessions.set(token, { email, expiresAt: Date.now() + sessionLifetimeMs });
+  res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
+  res.json({ authenticated: true, email, role: "Admin" });
+});
+app.post("/api/admin/logout", requireAdmin, (req, res) => {
+  const token = cookieValue(req, "nwa_admin_session");
+  sessions.delete(token);
+  res.setHeader("Set-Cookie", "nwa_admin_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0");
+  res.json({ ok: true });
+});
+
+app.get("/api/public/media", async (_req, res, next) => {
+  try {
+    const items = state.items.filter(x => x.published).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const used = await directoryBytes(mediaRoot);
+    res.json({ items: items.map(safePublicItem), usedBytes: used, limitBytes: totalMediaLimitBytes });
+  } catch (err) { next(err); }
+});
+app.get("/api/admin/media", requireAdmin, async (_req, res, next) => {
+  try {
+    const used = await directoryBytes(mediaRoot);
+    res.json({ items: state.items.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(safePublicItem), usedBytes: used, limitBytes: totalMediaLimitBytes });
+  } catch (err) { next(err); }
+});
+app.post("/api/admin/media", requireAdmin, upload.single("file"), async (req, res, next) => {
+  try {
+    const type = String(req.body.type || "");
+    const title = String(req.body.title || "").trim().slice(0, 120);
+    const description = String(req.body.description || "").trim().slice(0, 1000);
+    const published = req.body.published !== "false";
+    if (!title || !["Photo", "Video", "Lesson", "Announcement", "News"].includes(type)) {
+      if (req.file) req.file = null;
+      return sendError(res, 400, "Enter a title and choose a valid post type.");
+    }
+    if (["Photo", "Video", "Lesson"].includes(type) && !req.file) return sendError(res, 400, "Choose a file to upload.");
+    if (["Announcement", "News"].includes(type) && req.file && !allowedTypes.has(req.file.mimetype)) return sendError(res, 415, "This file type is not supported.");
+    if (req.file && !allowedTypes.has(req.file.mimetype)) return sendError(res, 415, "Use JPG, PNG, WEBP, MP4, WEBM, or PDF.");
+    const used = await directoryBytes(mediaRoot);
+    if (req.file && used + req.file.size > totalMediaLimitBytes) return sendError(res, 413, "The F1 media storage limit is full. Remove old media or use external storage.");
+    const id = crypto.randomUUID();
+    let filename = "";
+    if (req.file) {
+      const ext = ({ "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "video/mp4": ".mp4", "video/webm": ".webm", "application/pdf": ".pdf" })[req.file.mimetype];
+      filename = id + ext;
+      await fs.writeFile(path.join(mediaRoot, filename), req.file.buffer, { flag: "wx", mode: 0o600 });
+    }
+    const item = { id, type, title, description, filename, mimeType: req.file?.mimetype || "", size: req.file?.size || 0, createdAt: new Date().toISOString(), published };
+    state.items.unshift(item);
+    await saveState();
+    res.status(201).json(safePublicItem(item));
+  } catch (err) { next(err); }
+});
+app.delete("/api/admin/media/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const item = state.items.find(x => x.id === req.params.id);
+    if (!item) return sendError(res, 404, "Post not found.");
+    state.items = state.items.filter(x => x.id !== item.id);
+    await saveState();
+    if (item.filename) await fs.rm(path.join(mediaRoot, item.filename), { force: true });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+app.get("/api/media/:id", async (req, res, next) => {
+  try {
+    const item = state.items.find(x => x.id === req.params.id && x.published && x.filename);
+    if (!item) return res.sendStatus(404);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    if (item.type === "Lesson" && item.mimeType === "application/pdf") res.setHeader("Content-Disposition", "inline; filename=\"" + path.basename(item.filename) + "\"");
+    res.type(item.mimeType);
+    res.sendFile(path.join(mediaRoot, item.filename));
+  } catch (err) { next(err); }
+});
+
+app.use("/api", (_req, res) => sendError(res, 404, "API route not found."));
+app.use(express.static(siteRoot, { dotfiles: "deny", index: "index.html" }));
+app.get(/.*/, (_req, res) => res.sendFile(path.join(siteRoot, "index.html")));
+app.use((err, _req, res, _next) => {
+  console.error("Request failed:", err.message);
+  const status = err instanceof multer.MulterError ? 413 : 500;
+  res.status(status).json({ error: status === 413 ? "Upload exceeds the 50 MB file limit." : "The request could not be completed." });
+});
+
+async function start() {
+  await fs.mkdir(mediaRoot, { recursive: true, mode: 0o700 });
+  try { state = JSON.parse(await fs.readFile(statePath, "utf8")); }
+  catch (err) { if (err.code !== "ENOENT") throw err; await saveState(); }
+  if (!Array.isArray(state.items)) state.items = [];
+  app.listen(port, "0.0.0.0", () => console.log("N'wa Mhinga portal listening on port " + port));
+}
+start().catch(err => { console.error("Startup failed:", err.message); process.exit(1); });
