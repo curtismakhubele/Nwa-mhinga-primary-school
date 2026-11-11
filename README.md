@@ -92,3 +92,15 @@ Do not enter real learner identity, medical, or guardian information in this pro
 
 ### F1 hosting
 Azure App Service F1 can be used to host a prototype with fictional data. It provides shared compute with 60 CPU minutes per day and 1 GB of storage. Microsoft states Free and Shared plans have no SLA and aren't supported for production workloads. F1 storage is not the requested 250 TB object storage; Blob Storage is a separate service and may incur charges.
+
+
+## F1 live demo server
+The repository includes an Express server for shared media/news publishing. On an App Service F1 Linux app:
+1. Set `SCHOOL_DATA_DIR=/home/data` so uploads and the JSON content store use persistent App Service storage.
+2. Set `SCHOOL_ADMIN_EMAIL` and `SCHOOL_ADMIN_PASSWORD` in App Service Configuration. Use a unique password and never commit it.
+3. Set `SCHOOL_MEDIA_LIMIT_BYTES=629145600` (600 MiB) to reserve space below F1's 1 GB app-storage ceiling.
+4. Enable build during deployment so App Service installs `package.json` dependencies.
+
+Admins can upload JPG, PNG, WEBP, MP4, WEBM, and PDF files up to 50 MB. Announcements and news can be posted as text. Published items appear on the login page. Admin sign-in uses an HTTP-only Secure cookie.
+
+F1 is a demo host only. It is not an Azure Blob Storage account, has no production SLA, and cannot support the 250 TB target. The media files and content JSON live on the F1 app's persistent storage and must be migrated to Blob Storage before real operational use. This server does not make the existing admissions or learner-data flows multi-user.
