@@ -59,7 +59,7 @@ function login(){
  <div class="field"><label>Username / Email</label><input id="email" class="input" value="admin@nwamhingap.co.za"></div>
  <div class="field"><label>Password</label><input id="password" class="input" type="password" value="Admin@123"></div>
  <button class="btn btn-primary btn-full" onclick="doLogin()">Login</button>
- <div style="text-align:center;margin-top:12px"><button class="btn btn-soft" onclick="forgot()">Forgot Password?</button></div>
+ <div class="admissions-entry"><a class="btn btn-blue btn-full" href="./admissions.html">Apply for Admission</a><button class="btn btn-soft btn-full" onclick="forgot()">Forgot Password?</button><p class="muted">New learners can start an application without signing in.</p></div>
  <div class="demo-box"><b>Demo accounts</b><br>Admin: admin@nwamhingap.co.za / Admin@123<br>Principal: principal@nwamhingap.co.za / Principal@123<br>Teacher: teacher3@nwamhingap.co.za / Teacher@123<br>Parent: parent@nwamhingap.co.za / Parent@123<br>Learner: learner@nwamhingap.co.za / Learner@123</div>
  </div></section></div>`;
 }
