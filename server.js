@@ -18,7 +18,7 @@ const sessionLifetimeMs = 8 * 60 * 60 * 1000;
 const sessions = new Map();
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "audio/mpeg", "audio/mp4", "audio/webm", "audio/ogg", "audio/wav", "application/pdf"]);
 const mediaKinds = new Set(["Photo", "Video", "Audio", "Document", "Lesson", "Announcement", "News"]);
-let state = { items: [] };
+let state = { items: [], schoolData: null, admissions: [] };
 let writeQueue = Promise.resolve();
 
 app.disable("x-powered-by");
@@ -35,7 +35,7 @@ app.use(helmet({
     }
   }
 }));
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 function sendError(res, status, message) {
   return res.status(status).json({ error: message });
@@ -114,6 +114,40 @@ app.post("/api/admin/logout", requireAdmin, (req, res) => {
   sessions.delete(token);
   res.setHeader("Set-Cookie", "nwa_admin_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0");
   res.json({ ok: true });
+});
+
+// Shared school records for the F1 prototype. This is persistent app storage, not a database.
+app.get("/api/admin/data", requireAdmin, (_req, res) => res.json(state.schoolData ? { ...state.schoolData, initialized: true } : { initialized: false }));
+app.put("/api/admin/data", requireAdmin, async (req, res, next) => {
+  try {
+    const input = req.body && typeof req.body === "object" ? req.body : {};
+    const clean = {};
+    for (const key of ["learners", "assessments", "learnerAttendance", "learnerReports", "docs"]) {
+      if (!Array.isArray(input[key])) return sendError(res, 400, "School data must include valid record lists.");
+      clean[key] = input[key];
+    }
+    if (JSON.stringify(clean).length > 6 * 1024 * 1024) return sendError(res, 413, "School records exceed the F1 data limit.");
+    state.schoolData = clean;
+    await saveState();
+    res.json({ ok: true, savedAt: new Date().toISOString() });
+  } catch (err) { next(err); }
+});
+app.get("/api/admin/admissions", requireAdmin, (_req, res) => res.json({ items: state.admissions || [] }));
+app.post("/api/public/admissions", async (req, res, next) => {
+  try {
+    const record = req.body;
+    if (!record || !/^NMP-\d{4}-\d{5}$/.test(String(record.reference || "")) || !record.learner?.fullName || !record.application || typeof record.application !== "object") return sendError(res, 400, "The application is incomplete.");
+    const serialized = JSON.stringify(record);
+    if (serialized.length > 8 * 1024 * 1024) return sendError(res, 413, "Application is too large. Save fewer/smaller documents and retry.");
+    const admissions = Array.isArray(state.admissions) ? state.admissions : [];
+    if (Buffer.byteLength(JSON.stringify(admissions)) + Buffer.byteLength(serialized) > 80 * 1024 * 1024) return sendError(res, 413, "The school application storage quota is full.");
+    if (admissions.some(x => x.reference === record.reference)) return sendError(res, 409, "This application reference was already submitted.");
+    const saved = { ...record, status: "Received by school", receivedAt: new Date().toISOString() };
+    admissions.unshift(saved);
+    state.admissions = admissions;
+    await saveState();
+    res.status(201).json({ reference: saved.reference, status: saved.status, receivedAt: saved.receivedAt });
+  } catch (err) { next(err); }
 });
 
 app.get("/api/public/media", async (_req, res, next) => {
@@ -198,6 +232,8 @@ async function start() {
   try { state = JSON.parse(await fs.readFile(statePath, "utf8")); }
   catch (err) { if (err.code !== "ENOENT") throw err; await saveState(); }
   if (!Array.isArray(state.items)) state.items = [];
+  if (!Array.isArray(state.admissions)) state.admissions = [];
+  if (!state.schoolData || typeof state.schoolData !== "object") state.schoolData = null;
   app.listen(port, "0.0.0.0", () => console.log("N'wa Mhinga portal listening on port " + port));
 }
 start().catch(err => { console.error("Startup failed:", err.message); process.exit(1); });

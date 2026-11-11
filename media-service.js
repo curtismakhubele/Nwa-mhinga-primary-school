@@ -1,5 +1,6 @@
 "use strict";
 let mediaApiMode = false;
+window.mediaApiMode = false;
 let mediaRemotePosts = [];
 let mediaAdminView = "All";
 let mediaUsedBytes = 0;
@@ -65,6 +66,20 @@ async function refreshAdminMedia() {
     mediaLimitBytes = Number(data.limitBytes || 0);
     drawAdminMedia();
   } catch (err) { host.innerHTML = '<p class="err" style="display:block">' + esc(err.message) + '</p>'; }
+}
+async function loadSharedSchoolData() {
+  const r = await fetch("/api/admin/data", { credentials: "same-origin", cache: "no-store" });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || "Could not load school records.");
+  const keys = ["learners", "assessments", "learnerAttendance", "learnerReports", "docs"];
+  if (data.initialized) keys.forEach(k => { if (Array.isArray(data[k])) db[k] = data[k]; });
+  else {
+    keys.forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
+    const payload = Object.fromEntries(keys.map(k => [k, db[k]]));
+    const saved = await fetch("/api/admin/data", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!saved.ok) throw new Error("Could not initialize shared school records.");
+  }
+  localStorage.setItem("nwaEduCloudV2", JSON.stringify(db));
 }
 function drawAdminMedia() {
   const host = document.getElementById("media-admin-list"); if (!host) return;
@@ -156,7 +171,7 @@ window.doLogin = async function() {
     const data = await r.json();
     if (!r.ok) return alert(data.error || "Administrator sign-in failed.");
     window.apiUser = { id: "server-admin", name: "School Administrator", email: data.email, role: "Admin", assignedGrade: "All", assignedClass: "All", status: "Active" };
-    await refreshPublicMedia(); render("dashboard"); toast("Signed in as school administrator.");
+    await loadSharedSchoolData(); await refreshPublicMedia(); render("dashboard"); toast("Signed in as school administrator.");
   } catch { alert("The school server is not reachable. Try again shortly."); }
 };
 window.logout = async function() {
@@ -169,15 +184,26 @@ window.logout = async function() {
   return localPortalLogout();
 };
 async function initializeMediaApp() {
+  let health;
   try {
-    const health = await fetch("/api/health", { cache: "no-store" });
-    if (!health.ok) throw new Error("API unavailable");
-    mediaApiMode = true;
+    health = await fetch("/api/health", { cache: "no-store" });
+  } catch { health = null; }
+  if (!health || !health.ok) {
+    mediaApiMode = false;
+    window.mediaApiMode = false;
+    window.apiUser = null;
+    window.login();
+    return;
+  }
+  mediaApiMode = true;
+  window.mediaApiMode = true;
+  try {
     const session = await fetch("/api/admin/session", { credentials: "same-origin", cache: "no-store" });
     const status = await session.json();
     if (status.authenticated) {
       window.apiUser = { id: "server-admin", name: "School Administrator", email: status.email, role: "Admin", assignedGrade: "All", assignedClass: "All", status: "Active" };
-      render("dashboard");
+      try { await loadSharedSchoolData(); render("dashboard"); }
+      catch (e) { window.apiUser = null; window.login(); document.querySelector(".demo-box")?.remove(); const helper = document.querySelector(".login-card .muted"); if (helper) helper.textContent = e.message + " Contact the school system administrator."; }
     } else {
       window.apiUser = null;
       window.login();
@@ -190,9 +216,11 @@ async function initializeMediaApp() {
     }
     await refreshPublicMedia();
   } catch {
-    mediaApiMode = false;
     window.apiUser = null;
     window.login();
+    document.querySelector(".demo-box")?.remove();
+    const helper = document.querySelector(".login-card .muted");
+    if (helper) helper.textContent = "The school server could not load. Please refresh or contact the administrator.";
   }
 }
 initializeMediaApp();

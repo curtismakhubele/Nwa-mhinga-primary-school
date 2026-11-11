@@ -43,7 +43,13 @@ const demo={
  backup:{last:"Today, 14:32",status:"Completed",used:"2.4 GB / 10 GB",percent:82}
 };
 let db=JSON.parse(localStorage.getItem(DB_KEY)||"null")||demo;
-function save(){localStorage.setItem(DB_KEY,JSON.stringify(db))}
+function save(){
+ localStorage.setItem(DB_KEY,JSON.stringify(db));
+ if(window.apiUser){
+  const data={learners:db.learners||[],assessments:db.assessments||[],learnerAttendance:db.learnerAttendance||[],learnerReports:db.learnerReports||[],docs:db.docs||[]};
+  window.schoolDataWrite=(window.schoolDataWrite||Promise.resolve()).then(()=>fetch("/api/admin/data",{method:"PUT",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})).then(async r=>{if(!r.ok)throw new Error((await r.json()).error||"Save failed")}).catch(e=>{console.error("Shared school data save failed",e);toast("Shared save failed. Check the connection and retry.")});
+ }
+}
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function initials(n){return n.split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
 function toast(m){const x=document.querySelector(".toast");if(!x)return;x.textContent=m;x.classList.add("show");setTimeout(()=>x.classList.remove("show"),2200)}
