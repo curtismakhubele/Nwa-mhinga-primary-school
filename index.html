@@ -4,14 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>N'WA MHINGA P | School Data Management System</title>
-<link rel="stylesheet" href="style.css?v=school-portal-v5">
+<link rel="stylesheet" href="style.css?v=school-portal-v6">
 </head>
 <body>
 <div id="app"></div>
-<script src="app.js?v=school-portal-v5"></script>
-<script src="staff-attendance.js?v=school-portal-v5"></script>
-<script src="school-features.js?v=school-portal-v5"></script>
-<script src="media-service.js?v=school-portal-v5"></script>
+<div id="portal-loader" class="portal-loader" role="status" aria-live="polite" aria-label="Loading the N'wa Mhinga school portal">
+  <div class="loader-orbit orbit-one"></div><div class="loader-orbit orbit-two"></div>
+  <section class="loader-card">
+    <img src="nwa-mhinga-p-logo.png" alt="N'wa Mhinga Primary School" class="loader-logo">
+    <span class="loader-kicker">N’WA MHINGA PRIMARY</span>
+    <h1>Preparing your school portal</h1>
+    <p>Loading your learning space and school updates…</p>
+    <div class="loader-spinner" aria-hidden="true"></div>
+    <div class="loader-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
+  </section>
+</div>
+<script src="app.js?v=school-portal-v6"></script>
+<script src="staff-attendance.js?v=school-portal-v6"></script>
+<script src="school-features.js?v=school-portal-v6"></script>
+<script src="media-service.js?v=school-portal-v6"></script>
 </body>
 </html>
 

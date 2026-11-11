@@ -57,3 +57,22 @@ linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("school-bg.svg") 
 @media(max-width:1050px){.dash-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.dash-main-grid,.dash-bottom-grid{grid-template-columns:1fr}}
 @media(max-width:720px){.dash-welcome{min-height:190px;padding:21px}.dash-welcome-art{right:-85px;opacity:.45}.dash-welcome-copy{max-width:100%}.dash-welcome h1{font-size:22px}.dash-stats{gap:8px}.dash-stat{padding:11px;gap:8px}.dash-stat-icon{width:36px;height:36px}.dash-stat strong{font-size:20px}.dash-stat small{font-size:9px}.dash-main-grid,.dash-bottom-grid{gap:10px}.dash-bottom-grid .grade-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-x-labels{font-size:8px}}
 
+/* Branded first-load state while the portal checks the live school service. */
+.portal-loader{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;overflow:hidden;padding:24px;background:radial-gradient(ellipse at 50% 44%,#17354b 0%,#0a2032 55%,#061522 100%);transition:opacity .35s ease,visibility .35s ease}
+.portal-loader.is-hidden{opacity:0;visibility:hidden;pointer-events:none}
+.loader-card{position:relative;z-index:2;width:min(430px,100%);padding:34px 30px 28px;border:1px solid #ffffff20;border-radius:22px;background:rgba(255,255,255,.97);box-shadow:0 28px 90px #0005;text-align:center}
+.loader-logo{display:block;width:84px;height:84px;object-fit:contain;margin:0 auto 15px}
+.loader-kicker{display:block;color:#b7182a;font-size:10px;font-weight:900;letter-spacing:2px}
+.loader-card h1{margin:8px 0;color:#13283a;font-size:22px;line-height:1.25}
+.loader-card p{margin:0;color:#728092;font-size:13px}
+.loader-spinner{width:34px;height:34px;margin:22px auto 18px;border:3px solid #f2d9dc;border-top-color:#c51d2d;border-radius:50%;animation:portal-spin .85s linear infinite}
+.loader-skeleton{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
+.loader-skeleton i{height:7px;border-radius:8px;background:linear-gradient(100deg,#edf0f4 20%,#fff 45%,#edf0f4 70%);background-size:220% 100%;animation:portal-shimmer 1.4s ease-in-out infinite}
+.loader-skeleton i:nth-child(2){animation-delay:.12s}.loader-skeleton i:nth-child(3){animation-delay:.24s}
+.loader-orbit{position:absolute;width:310px;height:310px;border:1px solid #ffffff0d;border-radius:50%}
+.orbit-one{transform:translate(-41vw,-33vh)}.orbit-two{width:440px;height:440px;transform:translate(43vw,37vh)}
+@keyframes portal-spin{to{transform:rotate(360deg)}}
+@keyframes portal-shimmer{to{background-position-x:-220%}}
+@media(max-width:520px){.loader-card{padding:30px 22px 24px}.loader-logo{width:72px;height:72px}.loader-card h1{font-size:19px}}
+@media(prefers-reduced-motion:reduce){.portal-loader,.loader-spinner,.loader-skeleton i{animation:none;transition:none}}
+

@@ -193,6 +193,7 @@ async function initializeMediaApp() {
     window.mediaApiMode = false;
     window.apiUser = null;
     window.login();
+    dismissPortalLoader();
     return;
   }
   mediaApiMode = true;
@@ -215,13 +216,21 @@ async function initializeMediaApp() {
       if (helper) helper.textContent = "Sign in with the administrator account configured for this app.";
     }
     await refreshPublicMedia();
+    dismissPortalLoader();
   } catch {
     window.apiUser = null;
     window.login();
     document.querySelector(".demo-box")?.remove();
     const helper = document.querySelector(".login-card .muted");
     if (helper) helper.textContent = "The school server could not load. Please refresh or contact the administrator.";
+    dismissPortalLoader();
   }
+}
+function dismissPortalLoader() {
+  const loader = document.getElementById("portal-loader");
+  if (!loader) return;
+  loader.classList.add("is-hidden");
+  window.setTimeout(() => loader.remove(), 450);
 }
 initializeMediaApp();
 
