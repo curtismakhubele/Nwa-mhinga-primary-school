@@ -3,6 +3,7 @@ db.mediaPosts ||= [];
 db.learnerAttendance ||= [];
 db.learnerReports ||= [];
 db.assessments ||= [];
+db.backup={...(db.backup||{}),last:"Not connected",status:"Not connected",used:"0 / 250 TB",percent:0};
 Object.entries({
   Admin:["media","admissions"], Principal:["media","admissions"],
   "Vice Principal":[], Teacher:[], Parent:[], Learner:[]
@@ -88,7 +89,7 @@ window.classes=function(){
 };
 window.viewClass=function(c){
  const ls=assignedLearners().filter(l=>c.includes("/")?l.grade+" / "+l.class===c:l.grade===c);
- openModal(c+' learners','<div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Surname</th><th>ID</th><th>Gender</th><th></th></tr></thead><tbody>'+
+ openModal(c+' learners','<div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Surname</th><th>ID / learner no.</th><th>Gender</th><th></th></tr></thead><tbody>'+
  (ls.map(l=>'<tr><td>'+esc(displayGiven(l))+'</td><td>'+esc(displaySurname(l))+'</td><td>'+esc(l.nationalId||l.id)+'</td><td>'+esc(l.gender)+'</td><td><button class="btn btn-blue" onclick="viewLearner(\''+esc(l.id)+'\')">Learner profile</button></td></tr>').join("")||'<tr><td colspan="5">No learners.</td></tr>')+'</tbody></table></div>');
 };
 
@@ -102,7 +103,7 @@ window.viewLearner=function(id){
  const subjects=[...new Set([...(l.subjects||"").split(",").map(s=>s.trim()).filter(Boolean),...assess.map(a=>a.subject)])];
  const marks=terms.map(t=>'<section class="term-block"><h4>'+t+' · '+year+'</h4><div class="table-wrap"><table class="table"><thead><tr><th>Subject</th><th>Mark</th></tr></thead><tbody>'+
  (assess.filter(a=>a.term===t).map(a=>'<tr><td>'+esc(a.subject)+'</td><td>'+esc(a.mark)+'%</td></tr>').join("")||'<tr><td colspan="2" class="muted">No marks captured for this term.</td></tr>')+'</tbody></table></div><p><b>Attendance:</b> '+esc(att.find(a=>a.term===t)?.percent??"Not captured")+(att.find(a=>a.term===t)?"%":"")+'</p></section>').join("");
- openModal("Learner Profile",'<div class="learner-summary"><h3>'+esc(l.name)+'</h3><p><b>Name:</b> '+esc(displayGiven(l))+' &nbsp; <b>Surname:</b> '+esc(displaySurname(l))+'</p><p><b>ID:</b> '+esc(l.nationalId||l.id)+' &nbsp; <b>Gender:</b> '+esc(l.gender)+'</p><p><b>Grade / class:</b> '+esc(l.grade)+' / '+esc(l.class)+' &nbsp; <b>Parent:</b> '+esc(l.parent||"—")+'</p><p><b>Subjects:</b> '+esc(subjects.join(", ")||"Not captured")+'</p><button class="btn btn-blue" onclick="downloadLearnerReport(\''+esc(l.id)+'\')">Download learner report</button>'+
+ openModal("Learner Profile",'<div class="learner-summary"><h3>'+esc(l.name)+'</h3><p><b>Name:</b> '+esc(displayGiven(l))+' &nbsp; <b>Surname:</b> '+esc(displaySurname(l))+'</p><p><b>ID / learner number:</b> '+esc(l.nationalId||l.id)+' &nbsp; <b>Gender:</b> '+esc(l.gender)+'</p><p><b>Grade / class:</b> '+esc(l.grade)+' / '+esc(l.class)+' &nbsp; <b>Parent:</b> '+esc(l.parent||"—")+'</p><p><b>Subjects:</b> '+esc(subjects.join(", ")||"Not captured")+'</p><button class="btn btn-blue" onclick="downloadLearnerReport(\''+esc(l.id)+'\')">Download learner report</button>'+
  (["Admin","Principal","Vice Principal","Teacher"].includes(me().role)?' <button class="btn btn-soft" onclick="captureLearnerAttendance(\''+esc(l.id)+'\')">Capture attendance</button>':'')+'</div>'+marks);
 };
 window.captureLearnerAttendance=function(id){
@@ -148,7 +149,7 @@ window.generateLearnerReport=function(id){
 window.downloadLearnerReport=function(id){
  const l=db.learners.find(x=>x.id===id);if(!l)return;
  const marks=db.assessments.filter(a=>a.learnerId===id&&Number(a.year||liveYear())===liveYear()),attendance=db.learnerAttendance.filter(a=>a.learnerId===id&&Number(a.year)===liveYear());
- const rows=[["Learner Report",liveYear()],["Name",displayGiven(l)],["Surname",displaySurname(l)],["ID",l.nationalId||l.id],["Gender",l.gender],["Grade",l.grade],["Class",l.class],["Subjects",l.subjects||""],["Term","Subject","Mark"],...marks.map(a=>[a.term,a.subject,a.mark+"%"]),["Term","Attendance"],...terms.map(t=>[t,(attendance.find(a=>a.term===t)?.percent??"Not captured")+(attendance.some(a=>a.term===t)?"%":"")])];
+ const rows=[["Learner Report",liveYear()],["Name",displayGiven(l)],["Surname",displaySurname(l)],["ID / learner number",l.nationalId||l.id],["Gender",l.gender],["Grade",l.grade],["Class",l.class],["Subjects",l.subjects||""],["Term","Subject","Mark"],...marks.map(a=>[a.term,a.subject,a.mark+"%"]),["Term","Attendance"],...terms.map(t=>[t,(attendance.find(a=>a.term===t)?.percent??"Not captured")+(attendance.some(a=>a.term===t)?"%":"")])];
  const csv=rows.map(row=>row.map(v=>'"'+String(v??"").replace(/"/g,'""')+'"').join(",")).join("\r\n");
  download("learner-report-"+id+"-"+liveYear()+".csv",csv,"text/csv;charset=utf-8");
 };
