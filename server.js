@@ -94,16 +94,16 @@ app.get("/api/admin/session", (req, res) => {
 });
 app.post("/api/admin/login", (req, res) => {
   const configuredEmail = (process.env.SCHOOL_ADMIN_EMAIL || "").trim().toLowerCase();
-  const configuredPassword = process.env.SCHOOL_ADMIN_PASSWORD || "";
+  const configuredPassword = String(process.env.SCHOOL_ADMIN_PASSWORD || "").trim();
   const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
+  const password = String(req.body?.password || "").trim();
   if (!configuredEmail || !configuredPassword) {
     return sendError(res, 503, "Admin sign-in is not configured. Set SCHOOL_ADMIN_EMAIL and SCHOOL_ADMIN_PASSWORD in App Service settings.");
   }
   const provided = Buffer.from(password);
   const expected = Buffer.from(configuredPassword);
   const equalPassword = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
-  if (email !== configuredEmail || !equalPassword) return sendError(res, 401, "Invalid administrator credentials.");
+  if (email !== configuredEmail || !equalPassword) return sendError(res, 401, "Invalid administrator credentials. Use the exact SCHOOL_ADMIN_EMAIL and SCHOOL_ADMIN_PASSWORD saved in this App Service, then restart the app if you recently changed them.");
   const token = crypto.randomBytes(32).toString("base64url");
   sessions.set(token, { email, expiresAt: Date.now() + sessionLifetimeMs });
   res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
