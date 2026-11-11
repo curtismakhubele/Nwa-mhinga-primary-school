@@ -16,8 +16,9 @@ const maximumFileBytes = 50 * 1024 * 1024;
 const totalMediaLimitBytes = Number(process.env.SCHOOL_MEDIA_LIMIT_BYTES || 600 * 1024 * 1024);
 const sessionLifetimeMs = 8 * 60 * 60 * 1000;
 const sessions = new Map();
-const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "application/pdf"]);
-let state = { items: [] };
+const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "audio/mpeg", "audio/mp4", "audio/webm", "audio/ogg", "audio/wav", "application/pdf"]);
+const mediaKinds = new Set(["Photo", "Video", "Audio", "Document", "Lesson", "Announcement", "News"]);
+let state = { items: [], schoolData: null, admissions: [] };
 let writeQueue = Promise.resolve();
 
 app.disable("x-powered-by");
@@ -34,7 +35,7 @@ app.use(helmet({
     }
   }
 }));
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "10mb" }));
 
 function sendError(res, status, message) {
   return res.status(status).json({ error: message });
@@ -76,8 +77,8 @@ async function directoryBytes(dir) {
   return total;
 }
 function safePublicItem(item) {
-  const { id, type, title, description, filename, mimeType, size, createdAt, published } = item;
-  return { id, type, title, description, filename, mimeType, size, createdAt, published, fileUrl: item.filename ? "/api/media/" + encodeURIComponent(id) : "" };
+  const { id, type, title, description, filename, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate } = item;
+  return { id, type, title, description, filename, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate, fileUrl: item.filename ? "/api/media/" + encodeURIComponent(id) : "" };
 }
 
 const storage = multer.memoryStorage();
@@ -93,16 +94,16 @@ app.get("/api/admin/session", (req, res) => {
 });
 app.post("/api/admin/login", (req, res) => {
   const configuredEmail = (process.env.SCHOOL_ADMIN_EMAIL || "").trim().toLowerCase();
-  const configuredPassword = process.env.SCHOOL_ADMIN_PASSWORD || "";
+  const configuredPassword = String(process.env.SCHOOL_ADMIN_PASSWORD || "").trim();
   const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "");
+  const password = String(req.body?.password || "").trim();
   if (!configuredEmail || !configuredPassword) {
     return sendError(res, 503, "Admin sign-in is not configured. Set SCHOOL_ADMIN_EMAIL and SCHOOL_ADMIN_PASSWORD in App Service settings.");
   }
   const provided = Buffer.from(password);
   const expected = Buffer.from(configuredPassword);
   const equalPassword = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
-  if (email !== configuredEmail || !equalPassword) return sendError(res, 401, "Invalid administrator credentials.");
+  if (email !== configuredEmail || !equalPassword) return sendError(res, 401, "Invalid administrator credentials. Use the exact SCHOOL_ADMIN_EMAIL and SCHOOL_ADMIN_PASSWORD saved in this App Service, then restart the app if you recently changed them.");
   const token = crypto.randomBytes(32).toString("base64url");
   sessions.set(token, { email, expiresAt: Date.now() + sessionLifetimeMs });
   res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
@@ -113,6 +114,40 @@ app.post("/api/admin/logout", requireAdmin, (req, res) => {
   sessions.delete(token);
   res.setHeader("Set-Cookie", "nwa_admin_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0");
   res.json({ ok: true });
+});
+
+// Shared school records for the F1 prototype. This is persistent app storage, not a database.
+app.get("/api/admin/data", requireAdmin, (_req, res) => res.json(state.schoolData ? { ...state.schoolData, initialized: true } : { initialized: false }));
+app.put("/api/admin/data", requireAdmin, async (req, res, next) => {
+  try {
+    const input = req.body && typeof req.body === "object" ? req.body : {};
+    const clean = {};
+    for (const key of ["learners", "assessments", "learnerAttendance", "learnerReports", "docs"]) {
+      if (!Array.isArray(input[key])) return sendError(res, 400, "School data must include valid record lists.");
+      clean[key] = input[key];
+    }
+    if (JSON.stringify(clean).length > 6 * 1024 * 1024) return sendError(res, 413, "School records exceed the F1 data limit.");
+    state.schoolData = clean;
+    await saveState();
+    res.json({ ok: true, savedAt: new Date().toISOString() });
+  } catch (err) { next(err); }
+});
+app.get("/api/admin/admissions", requireAdmin, (_req, res) => res.json({ items: state.admissions || [] }));
+app.post("/api/public/admissions", async (req, res, next) => {
+  try {
+    const record = req.body;
+    if (!record || !/^NMP-\d{4}-\d{5}$/.test(String(record.reference || "")) || !record.learner?.fullName || !record.application || typeof record.application !== "object") return sendError(res, 400, "The application is incomplete.");
+    const serialized = JSON.stringify(record);
+    if (serialized.length > 8 * 1024 * 1024) return sendError(res, 413, "Application is too large. Save fewer/smaller documents and retry.");
+    const admissions = Array.isArray(state.admissions) ? state.admissions : [];
+    if (Buffer.byteLength(JSON.stringify(admissions)) + Buffer.byteLength(serialized) > 80 * 1024 * 1024) return sendError(res, 413, "The school application storage quota is full.");
+    if (admissions.some(x => x.reference === record.reference)) return sendError(res, 409, "This application reference was already submitted.");
+    const saved = { ...record, status: "Received by school", receivedAt: new Date().toISOString() };
+    admissions.unshift(saved);
+    state.admissions = admissions;
+    await saveState();
+    res.status(201).json({ reference: saved.reference, status: saved.status, receivedAt: saved.receivedAt });
+  } catch (err) { next(err); }
 });
 
 app.get("/api/public/media", async (_req, res, next) => {
@@ -134,23 +169,28 @@ app.post("/api/admin/media", requireAdmin, upload.single("file"), async (req, re
     const title = String(req.body.title || "").trim().slice(0, 120);
     const description = String(req.body.description || "").trim().slice(0, 1000);
     const published = req.body.published !== "false";
-    if (!title || !["Photo", "Video", "Lesson", "Announcement", "News"].includes(type)) {
+    if (!title || !mediaKinds.has(type)) {
       if (req.file) req.file = null;
       return sendError(res, 400, "Enter a title and choose a valid post type.");
     }
-    if (["Photo", "Video", "Lesson"].includes(type) && !req.file) return sendError(res, 400, "Choose a file to upload.");
+    if (["Photo", "Video", "Audio", "Document", "Lesson"].includes(type) && !req.file) return sendError(res, 400, "Choose a file to upload.");
     if (["Announcement", "News"].includes(type) && req.file && !allowedTypes.has(req.file.mimetype)) return sendError(res, 415, "This file type is not supported.");
     if (req.file && !allowedTypes.has(req.file.mimetype)) return sendError(res, 415, "Use JPG, PNG, WEBP, MP4, WEBM, or PDF.");
+    const grade = String(req.body.grade || "").trim().slice(0, 20);
+    const subject = String(req.body.subject || "").trim().slice(0, 80);
+    const teacher = String(req.body.teacher || "").trim().slice(0, 100);
+    const lessonDate = String(req.body.lessonDate || "").trim().slice(0, 10);
+    if (type === "Lesson" && (!grade || !subject || !/^\d{4}-\d{2}-\d{2}$/.test(lessonDate))) return sendError(res, 400, "Choose a grade, subject, and lesson date.");
     const used = await directoryBytes(mediaRoot);
     if (req.file && used + req.file.size > totalMediaLimitBytes) return sendError(res, 413, "The F1 media storage limit is full. Remove old media or use external storage.");
     const id = crypto.randomUUID();
     let filename = "";
     if (req.file) {
-      const ext = ({ "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "video/mp4": ".mp4", "video/webm": ".webm", "application/pdf": ".pdf" })[req.file.mimetype];
+      const ext = ({ "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "video/mp4": ".mp4", "video/webm": ".webm", "audio/mpeg": ".mp3", "audio/mp4": ".m4a", "audio/webm": ".weba", "audio/ogg": ".ogg", "audio/wav": ".wav", "application/pdf": ".pdf" })[req.file.mimetype];
       filename = id + ext;
       await fs.writeFile(path.join(mediaRoot, filename), req.file.buffer, { flag: "wx", mode: 0o600 });
     }
-    const item = { id, type, title, description, filename, mimeType: req.file?.mimetype || "", size: req.file?.size || 0, createdAt: new Date().toISOString(), published };
+    const item = { id, type, title, description, grade, subject, teacher, lessonDate, filename, mimeType: req.file?.mimetype || "", size: req.file?.size || 0, createdAt: new Date().toISOString(), published };
     state.items.unshift(item);
     await saveState();
     res.status(201).json(safePublicItem(item));
@@ -192,6 +232,9 @@ async function start() {
   try { state = JSON.parse(await fs.readFile(statePath, "utf8")); }
   catch (err) { if (err.code !== "ENOENT") throw err; await saveState(); }
   if (!Array.isArray(state.items)) state.items = [];
+  if (!Array.isArray(state.admissions)) state.admissions = [];
+  if (!state.schoolData || typeof state.schoolData !== "object") state.schoolData = null;
   app.listen(port, "0.0.0.0", () => console.log("N'wa Mhinga portal listening on port " + port));
 }
 start().catch(err => { console.error("Startup failed:", err.message); process.exit(1); });
+

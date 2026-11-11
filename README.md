@@ -84,8 +84,8 @@ The interface now uses the exact N'WA MHINGA P crest/logo extracted from the sup
 - Admin and Principal accounts can add media links and review admissions saved in the same browser.
 - Learner profiles show marks and captured attendance by Term 1–4 for the current year. Learner Reports can be generated and downloaded as CSV by users in the learner's access scope.
 
-## Not yet a live multi-user service
-This repository is currently a static GitHub Pages prototype. Login state, learner data, media posts, generated reports, and the admissions inbox use browser localStorage. An application entered on one device is not delivered to school staff on another device. Uploaded documents and reports are not stored in Azure. The Cloud Backup screen reports that Azure is not connected and that no cloud backup was made.
+## Hosted app status
+The GitHub Pages site is a static prototype. The Azure App Service branch runs the Express app: admin-published media/news, submitted admissions, learner records, assessments, attendance, and generated report records use the server API. The static Pages copy continues using browser storage for prototype data. See the F1 limitations below before using the hosted app.
 
 Do not enter real learner identity, medical, or guardian information in this prototype. Azure hosting, authentication, a shared database, secure document storage, retention controls, and server-side role enforcement must be configured before real use. The requested 250 TB is a target capacity; Azure charges by stored data and operations rather than reserving a 250 TB block upfront.
 
@@ -94,13 +94,14 @@ Do not enter real learner identity, medical, or guardian information in this pro
 Azure App Service F1 can be used to host a prototype with fictional data. It provides shared compute with 60 CPU minutes per day and 1 GB of storage. Microsoft states Free and Shared plans have no SLA and aren't supported for production workloads. F1 storage is not the requested 250 TB object storage; Blob Storage is a separate service and may incur charges.
 
 
-## F1 live demo server
+## F1 live prototype
 The repository includes an Express server for shared media/news publishing. On an App Service F1 Linux app:
 1. Set `SCHOOL_DATA_DIR=/home/data` so uploads and the JSON content store use persistent App Service storage.
 2. Set `SCHOOL_ADMIN_EMAIL` and `SCHOOL_ADMIN_PASSWORD` in App Service Configuration. Use a unique password and never commit it.
 3. Set `SCHOOL_MEDIA_LIMIT_BYTES=629145600` (600 MiB) to reserve space below F1's 1 GB app-storage ceiling.
 4. Enable build during deployment so App Service installs `package.json` dependencies.
 
-Admins can upload JPG, PNG, WEBP, MP4, WEBM, and PDF files up to 50 MB. Announcements and news can be posted as text. Published items appear on the login page. Admin sign-in uses an HTTP-only Secure cookie.
+Admins can publish JPG, PNG, WEBP, MP4, WEBM, MP3, M4A, OGG, WAV, and PDF content up to 50 MB. Lessons include grade, subject, teacher, and date fields; media, lessons, news, and announcements appear on the login page. Admin sign-in uses an HTTP-only Secure cookie. Admissions submitted through the hosted form are sent to the server inbox. Learners, assessments, attendance, and generated report records sync to the server when an administrator is signed in.
 
-F1 is a demo host only. It is not an Azure Blob Storage account, has no production SLA, and cannot support the 250 TB target. The media files and content JSON live on the F1 app's persistent storage and must be migrated to Blob Storage before real operational use. This server does not make the existing admissions or learner-data flows multi-user.
+F1 is a prototype host only. It is not an Azure Blob Storage account, has no production SLA, and cannot support the 250 TB target. Records and admission document attachments are stored in a JSON file in the app's persistent storage; media files are stored on that same limited host. No separate backup is configured. Parent/learner accounts are not yet authenticated against the server, and the current shared records API is administrator-only. Do not use this build for real learner or guardian information until the school has moved to a managed database and object storage, enabled complete role-based accounts, and reviewed privacy, retention, encryption, and backups.
+

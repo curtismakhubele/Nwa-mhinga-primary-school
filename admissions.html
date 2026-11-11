@@ -473,6 +473,7 @@ const toDataUrl = f => new Promise((res,rej)=>{ const r = new FileReader(); r.on
 /* ---------- step 3: create profile ---------- */
 $('submitApp').addEventListener('click', async () => {
   $('submitApp').disabled = true;
+  if(files && Object.values(files).flat().reduce((n,f)=>n+f.size,0)>6*1024*1024){ $('submitApp').disabled=false; $('err2').style.display='block'; $('err2').textContent='The combined documents are over 6 MB. Remove or compress files before sending.'; return; }
   const data = collect();
   const docs = {};
   for(const d of DOCS){
@@ -485,7 +486,7 @@ $('submitApp').addEventListener('click', async () => {
   const ref = 'NMP-' + year + '-' + String(Math.floor(10000 + Math.random()*90000));
   record = {
     reference: ref,
-    status: 'Saved on this device — not yet sent to school',
+    status: 'Sending to school…',
     submittedAt: new Date().toISOString(),
     learner: {
       fullName: ((data['Learner first name']||'') + ' ' + (data['Learner surname']||'')).trim(),
@@ -495,8 +496,21 @@ $('submitApp').addEventListener('click', async () => {
     application: data,
     documents: docs
   };
+  let stored = false;
+  try {
+    const response = await fetch('/api/public/admissions', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
+    const result = await response.json();
+    if(!response.ok) throw new Error(result.error || 'The school could not receive this application.');
+    record.status = result.status;
+    record.receivedAt = result.receivedAt;
+    stored = true;
+  } catch(error) {
+    record.status = 'Not sent to school — saved on this device only';
+    $('err2').style.display = 'block';
+    $('err2').textContent = error.message + ' Keep this page open and contact the school before assuming the application was received.';
+  }
   const list = loadAll(); list.push(slim(record));
-  const stored = saveAll(list);
+  saveAll(list);
   renderProfile(record, stored);
   renderSaved();
   showStep(3);
@@ -532,7 +546,7 @@ function renderProfile(r, stored){
   p.append(section('Parent / guardian', [['Name', ((a['Parent title']||'') + ' ' + (a['Parent first name']||'') + ' ' + (a['Parent surname']||'')).trim()], ['Relationship', a['Relationship to learner']], ['ID / passport', a['Parent ID / passport']], ['Cell', a['Parent cell']], ['Email', a['Parent email']], ['Account payer', a['Account payer']], ['Address', a['Parent residential address']]]));
   p.append(section('Documents received', Object.entries(r.documents).map(([k,v]) => [k, v.map(f => f.name).join(', ')])));
   const note = document.createElement('p'); note.className = 'hint noprint';
-  note.textContent = stored ? 'This profile is saved in this browser. Download a copy to keep it safe.' : 'This browser blocked saving, so the profile is only kept while this page is open. Download it now.';
+  note.textContent = stored ? 'The school server received this application. Keep your reference number for follow-up.' : 'The application was saved only on this device and has NOT been sent to the school. Download it and contact the school to submit it.';
   p.append(note);
 }
 
@@ -577,3 +591,4 @@ renderSaved();
 </script>
 </body>
 </html>
+
