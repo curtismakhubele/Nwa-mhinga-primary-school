@@ -21,12 +21,25 @@ const mediaKinds = new Set(["Photo", "Video", "Audio", "Document", "Lesson", "An
 let state = { items: [], schoolData: null, admissions: [] };
 let writeQueue = Promise.resolve();
 
+function appSetting(name) {
+  const direct = process.env[name];
+  if (typeof direct === "string" && direct.length > 0) return direct;
+
+  // App Service prefixes values stored under its Connection strings blade.
+  const prefixes = ["CUSTOMCONNSTR_", "SQLCONNSTR_", "SQLAZURECONNSTR_", "MYSQLCONNSTR_", "POSTGRESQLCONNSTR_", "DOCDBCONNSTR_", "REDISCACHECONNSTR_", "SERVICEBUSCONNSTR_", "EVENTHUBCONNSTR_", "NOTIFICATIONHUBCONNSTR_"];
+  const expected = new Set(prefixes.map(prefix => (prefix + name).toUpperCase()));
+  const entry = Object.entries(process.env).find(([key, value]) => expected.has(key.toUpperCase()) && typeof value === "string" && value.length > 0);
+  return entry ? entry[1] : "";
+}
+
 app.disable("x-powered-by");
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
+      // The existing portal controls, including Login, use inline onclick handlers.
+      scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
       mediaSrc: ["'self'", "https:"],
@@ -93,21 +106,26 @@ app.get("/api/admin/session", (req, res) => {
   res.json({ authenticated: !!admin, email: admin?.email || null });
 });
 app.post("/api/admin/login", (req, res) => {
-  const configuredEmail = (process.env.SCHOOL_ADMIN_EMAIL || "").trim().toLowerCase();
-  const configuredPassword = String(process.env.SCHOOL_ADMIN_PASSWORD || "").trim();
+  const configuredAdmins = [
+    { email: appSetting("SCHOOL_ADMIN_EMAIL").trim().toLowerCase(), password: appSetting("SCHOOL_ADMIN_PASSWORD").trim() },
+    { email: appSetting("SCHOOL_ADMIN_TEST_EMAIL").trim().toLowerCase(), password: appSetting("SCHOOL_ADMIN_TEST_PASSWORD").trim() }
+  ].filter(admin => admin.email && admin.password);
   const email = String(req.body?.email || "").trim().toLowerCase();
   const password = String(req.body?.password || "").trim();
-  if (!configuredEmail || !configuredPassword) {
-    return sendError(res, 503, "Admin sign-in is not configured. Set SCHOOL_ADMIN_EMAIL and SCHOOL_ADMIN_PASSWORD in App Service settings.");
+  if (!configuredAdmins.length) {
+    return sendError(res, 503, "Admin sign-in is not configured. Add administrator credentials in App Service settings.");
   }
   const provided = Buffer.from(password);
-  const expected = Buffer.from(configuredPassword);
-  const equalPassword = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
-  if (email !== configuredEmail || !equalPassword) return sendError(res, 401, "Invalid administrator credentials. Use the exact SCHOOL_ADMIN_EMAIL and SCHOOL_ADMIN_PASSWORD saved in this App Service, then restart the app if you recently changed them.");
+  const matchedAdmin = configuredAdmins.find(admin => {
+    const expected = Buffer.from(admin.password);
+    const equalPassword = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+    return email === admin.email && equalPassword;
+  });
+  if (!matchedAdmin) return sendError(res, 401, "Invalid administrator credentials. Use an admin account configured in this App Service.");
   const token = crypto.randomBytes(32).toString("base64url");
-  sessions.set(token, { email, expiresAt: Date.now() + sessionLifetimeMs });
+  sessions.set(token, { email: matchedAdmin.email, expiresAt: Date.now() + sessionLifetimeMs });
   res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
-  res.json({ authenticated: true, email, role: "Admin" });
+  res.json({ authenticated: true, email: matchedAdmin.email, role: "Admin" });
 });
 app.post("/api/admin/logout", requireAdmin, (req, res) => {
   const token = cookieValue(req, "nwa_admin_session");
@@ -237,4 +255,5 @@ async function start() {
   app.listen(port, "0.0.0.0", () => console.log("N'wa Mhinga portal listening on port " + port));
 }
 start().catch(err => { console.error("Startup failed:", err.message); process.exit(1); });
+
 
