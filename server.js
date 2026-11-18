@@ -16,7 +16,17 @@ const maximumFileBytes = 50 * 1024 * 1024;
 const totalMediaLimitBytes = Number(process.env.SCHOOL_MEDIA_LIMIT_BYTES || 600 * 1024 * 1024);
 const sessionLifetimeMs = 8 * 60 * 60 * 1000;
 const sessions = new Map();
-const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "audio/mpeg", "audio/mp4", "audio/webm", "audio/ogg", "audio/wav", "application/pdf"]);
+const extensionMimeTypes = {
+  ".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",".gif":"image/gif",".avif":"image/avif",".bmp":"image/bmp",".tif":"image/tiff",".tiff":"image/tiff",".heic":"image/heic",".heif":"image/heif",
+  ".mp4":"video/mp4",".m4v":"video/mp4",".webm":"video/webm",".ogv":"video/ogg",".mov":"video/quicktime",".mkv":"video/x-matroska",".avi":"video/x-msvideo",".wmv":"video/x-ms-wmv",".mpg":"video/mpeg",".mpeg":"video/mpeg",".3gp":"video/3gpp",".3g2":"video/3gpp2",
+  ".mp3":"audio/mpeg",".m4a":"audio/mp4",".aac":"audio/aac",".wav":"audio/wav",".flac":"audio/flac",".ogg":"audio/ogg",".oga":"audio/ogg",".weba":"audio/webm",
+  ".pdf":"application/pdf",".doc":"application/msword",".docx":"application/vnd.openxmlformats-officedocument.wordprocessingml.document",".docm":"application/vnd.ms-word.document.macroEnabled.12",
+  ".xls":"application/vnd.ms-excel",".xlsx":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",".xlsm":"application/vnd.ms-excel.sheet.macroEnabled.12",
+  ".ppt":"application/vnd.ms-powerpoint",".pptx":"application/vnd.openxmlformats-officedocument.presentationml.presentation",".pptm":"application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+  ".odt":"application/vnd.oasis.opendocument.text",".ods":"application/vnd.oasis.opendocument.spreadsheet",".odp":"application/vnd.oasis.opendocument.presentation",
+  ".rtf":"application/rtf",".txt":"text/plain",".csv":"text/csv"
+};
+const allowedTypes = new Set(Object.values(extensionMimeTypes));
 const mediaKinds = new Set(["Photo", "Video", "Audio", "Document", "Lesson", "Announcement", "News"]);
 let state = { items: [], schoolData: null, admissions: [] };
 let writeQueue = Promise.resolve();
@@ -90,8 +100,13 @@ async function directoryBytes(dir) {
   return total;
 }
 function safePublicItem(item) {
-  const { id, type, title, description, filename, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate } = item;
-  return { id, type, title, description, filename, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate, fileUrl: item.filename ? "/api/media/" + encodeURIComponent(id) : "" };
+  const { id, type, title, description, filename, originalName, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate } = item;
+  return { id, type, title, description, filename, originalName, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate, fileUrl: item.filename ? "/api/media/" + encodeURIComponent(id) : "" };
+}
+function uploadedMimeType(file) {
+  const supplied = String(file.mimetype || "").toLowerCase();
+  if (allowedTypes.has(supplied)) return supplied;
+  return extensionMimeTypes[path.extname(String(file.originalname || "")).toLowerCase()] || "";
 }
 
 const storage = multer.memoryStorage();
@@ -218,8 +233,8 @@ app.post("/api/admin/media", requireAdmin, upload.single("file"), async (req, re
       return sendError(res, 400, "Enter a title and choose a valid post type.");
     }
     if (["Photo", "Video", "Audio", "Document", "Lesson"].includes(type) && !req.file) return sendError(res, 400, "Choose a file to upload.");
-    if (["Announcement", "News"].includes(type) && req.file && !allowedTypes.has(req.file.mimetype)) return sendError(res, 415, "This file type is not supported.");
-    if (req.file && !allowedTypes.has(req.file.mimetype)) return sendError(res, 415, "Use JPG, PNG, WEBP, MP4, WEBM, or PDF.");
+    const mimeType = req.file ? uploadedMimeType(req.file) : "";
+    if (req.file && !mimeType) return sendError(res, 415, "Unsupported file. Use a common image, video, audio, PDF, Office, OpenDocument, RTF, CSV, or text file.");
     const grade = String(req.body.grade || "").trim().slice(0, 20);
     const subject = String(req.body.subject || "").trim().slice(0, 80);
     const teacher = String(req.body.teacher || "").trim().slice(0, 100);
@@ -230,11 +245,13 @@ app.post("/api/admin/media", requireAdmin, upload.single("file"), async (req, re
     const id = crypto.randomUUID();
     let filename = "";
     if (req.file) {
-      const ext = ({ "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "video/mp4": ".mp4", "video/webm": ".webm", "audio/mpeg": ".mp3", "audio/mp4": ".m4a", "audio/webm": ".weba", "audio/ogg": ".ogg", "audio/wav": ".wav", "application/pdf": ".pdf" })[req.file.mimetype];
-      filename = id + ext;
+      const ext = path.extname(String(req.file.originalname || "")).toLowerCase();
+      const safeExt = extensionMimeTypes[ext] === mimeType ? ext : Object.keys(extensionMimeTypes).find(candidate => extensionMimeTypes[candidate] === mimeType) || ".bin";
+      filename = id + safeExt;
       await fs.writeFile(path.join(mediaRoot, filename), req.file.buffer, { flag: "wx", mode: 0o600 });
     }
-    const item = { id, type, title, description, grade, subject, teacher, lessonDate, filename, mimeType: req.file?.mimetype || "", size: req.file?.size || 0, createdAt: new Date().toISOString(), published };
+    const originalName = req.file ? path.basename(String(req.file.originalname || "uploaded-file")).replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 180) : "";
+    const item = { id, type, title, description, grade, subject, teacher, lessonDate, filename, originalName, mimeType, size: req.file?.size || 0, createdAt: new Date().toISOString(), published };
     state.items.unshift(item);
     await saveState();
     res.status(201).json(safePublicItem(item));
@@ -256,7 +273,10 @@ app.get("/api/media/:id", async (req, res, next) => {
     if (!item) return res.sendStatus(404);
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "public, max-age=300");
-    if (item.type === "Lesson" && item.mimeType === "application/pdf") res.setHeader("Content-Disposition", "inline; filename=\"" + path.basename(item.filename) + "\"");
+    if (item.mimeType === "application/pdf") res.setHeader("Content-Disposition", "inline; filename=\"" + path.basename(item.filename) + "\"");
+    else if (!item.mimeType.startsWith("image/") && !item.mimeType.startsWith("video/") && !item.mimeType.startsWith("audio/")) {
+      res.attachment(item.originalName || path.basename(item.filename));
+    }
     res.type(item.mimeType);
     res.sendFile(path.join(mediaRoot, item.filename));
   } catch (err) { next(err); }
