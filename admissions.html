@@ -6,20 +6,23 @@
 <title>Admissions – N'wa Mhinga Primary School</title>
 <style>
   :root{
-    --paper:#f3f6fb; --surface:#ffffff; --ink:#14213d; --muted:#51607a;
-    --line:#b9c6dc; --accent:#1f4fa3; --accent-ink:#ffffff; --office:#e9edf5; --err:#b3261e; --ok:#1b7a43;
+    --paper:#f3f6f8; --surface:#ffffff; --ink:#10293d; --muted:#5b6875;
+    --line:#d2dce4; --accent:#c51d2d; --accent-ink:#ffffff; --office:#edf2f5; --err:#b3261e; --ok:#1b7a43;
   }
   @media (prefers-color-scheme: dark){
     :root{
-      --paper:#0f1626; --surface:#17203a; --ink:#e8edf8; --muted:#9fb0cf;
-      --line:#34456b; --accent:#7ea6ff; --accent-ink:#0f1626; --office:#1d2846; --err:#ff8a80; --ok:#6fd49a;
+      --paper:#081a29; --surface:#0d273b; --ink:#f1f5f8; --muted:#bdc9d2;
+      --line:#355066; --accent:#e51d2a; --accent-ink:#ffffff; --office:#132f42; --err:#ff8a80; --ok:#6fd49a;
     }
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 "Source Sans 3","Segoe UI",system-ui,sans-serif}
   .wrap{max-width:860px;margin:0 auto;padding:20px 16px 80px}
-  header.head{background:var(--surface);border:1.5px solid var(--ink);padding:18px 20px;margin-bottom:14px}
-  header.head h1{margin:0;font:700 1.45rem/1.2 Georgia,"Times New Roman",serif}
+  header.head{background:var(--surface);border:1.5px solid var(--line);border-top:6px solid var(--accent);border-radius:10px;padding:18px 20px;margin-bottom:14px;box-shadow:0 8px 24px #081a2912}
+  .brand-row{display:flex;align-items:center;gap:18px}
+  .school-logo{display:block;width:82px;height:90px;object-fit:contain;flex:none}
+  .brand-kicker{display:block;color:var(--accent);font-size:.72rem;font-weight:900;letter-spacing:.14em;margin-bottom:4px}
+  header.head h1{margin:0;color:var(--ink);font:700 1.45rem/1.2 Georgia,"Times New Roman",serif}
   header.head p{margin:4px 0 0;color:var(--muted)}
   .meta{display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:10px;font-size:.95rem}
   .steps{display:flex;gap:8px;margin:0 0 16px;padding:0;list-style:none}
@@ -31,7 +34,7 @@
   legend{font:700 1.05rem Georgia,serif;padding:0 8px}
   .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
   .c3{grid-column:span 3}.c4{grid-column:span 4}.c6{grid-column:span 6}.c8{grid-column:span 8}.c12{grid-column:span 12}
-  @media(max-width:640px){.c3,.c4,.c6,.c8{grid-column:span 12}.steps li{font-size:.8rem}}
+  @media(max-width:640px){.c3,.c4,.c6,.c8{grid-column:span 12}.steps li{font-size:.8rem}.brand-row{align-items:flex-start;gap:12px}.school-logo{width:64px;height:70px}header.head{padding:14px}.brand-row h1{font-size:1.2rem}}
   label,.lbl{display:block;font-size:.88rem;font-weight:600;color:var(--muted);margin-bottom:3px}
   input[type=text],input[type=email],input[type=tel],input[type=date],input[type=number],select,textarea{
     width:100%;padding:9px 10px;font:inherit;color:var(--ink);background:var(--paper);
@@ -46,10 +49,12 @@
   .sib{display:grid;grid-template-columns:1fr 110px;gap:12px;margin-bottom:10px}
   .office{background:var(--office);border-style:dashed}
   .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:20px}
-  button{font:600 1rem inherit;font-family:inherit;padding:12px 22px;border-radius:3px;cursor:pointer;border:1.5px solid var(--accent)}
+  button{font:600 1rem inherit;font-family:inherit;padding:12px 22px;border-radius:6px;cursor:pointer;border:1.5px solid var(--accent)}
   button:disabled{opacity:.45;cursor:not-allowed}
   .primary{background:var(--accent);color:var(--accent-ink)}
+  .primary:hover{filter:brightness(.92)}
   .secondary{background:transparent;color:var(--accent)}
+  .secondary:hover{background:var(--office)}
   .sig{border-bottom:1.5px solid var(--ink);height:44px}
   .gradebar{background:var(--surface);border:1.5px solid var(--accent);padding:14px 16px;margin-bottom:18px}
   .gradebar select{max-width:260px}
@@ -83,8 +88,14 @@
 <div class="wrap">
 
 <header class="head">
-  <h1>Application for admission to school</h1>
-  <p><strong>N'wa Mhinga Primary School</strong> &ndash; Grades R to 7</p>
+  <div class="brand-row">
+    <img class="school-logo" src="./nwa-mhinga-p-logo.png" alt="N'wa Mhinga Primary School logo">
+    <div>
+      <span class="brand-kicker">N'WA MHINGA P</span>
+      <h1>Application for admission to school</h1>
+      <p><strong>N'wa Mhinga Primary School</strong> &ndash; Grades R to 7</p>
+    </div>
+  </div>
   <div class="meta">
     <span>2 Ntsu Street, Pretoria, 0125</span>
     <span>Tel: 012 375 5514</span>
@@ -92,7 +103,7 @@
   </div>
 </header>
 <nav style="margin:-2px 0 14px"><a href="./index.html" style="color:var(--accent);font-weight:700">← Back to school portal</a></nav>
-<p class="note"><strong>Application portal preview:</strong> This version saves the application in this browser only. It does not send information to the school. Do not enter real identity, medical, or financial information until secure submission is configured.</p>
+<p class="note"><strong>Application portal:</strong> Submit the completed form to send it to the school. A receipt reference appears after the server receives it. This is still a prototype; do not enter real identity, medical, or financial information.</p>
 
 <ol class="steps" id="steps">
   <li class="on">1. Application form</li>
@@ -591,4 +602,5 @@ renderSaved();
 </script>
 </body>
 </html>
+
 

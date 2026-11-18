@@ -145,10 +145,10 @@ function classesForUser(){
 }
 function users(){
  if(me().role!=="Admin")return `<div class="page-title"><div><h1>User & Access Management</h1><div class="muted">Only the system administrator can assign credentials and access.</div></div></div><div class="card"><div class="empty">Administrator access required.</div></div>`;
- return `<div class="page-title"><div><h1>User & Access Management</h1><div class="muted">Create accounts, assign roles, grade/class scope, credentials and permissions.</div></div><button class="btn btn-primary" onclick="openUser()">+ Create User</button></div>
+ return `<div class="page-title"><div><h1>User & Access Management</h1><div class="muted">Create, edit, and remove accounts, roles, grade/class scope, and credentials.</div></div><button class="btn btn-primary" onclick="openUser()">+ Create User</button></div>
  <div class="card"><div class="toolbar"><input id="userQ" class="input" placeholder="Search name/email..." oninput="filterUsers()"><select id="userRole" onchange="filterUsers()"><option value="">All roles</option>${["Admin","Principal","Vice Principal","Teacher","Parent","Learner"].map(x=>`<option>${x}</option>`).join("")}</select></div><div id="usersTable">${userTable(db.users)}</div></div>`;
 }
-function userTable(arr){return `<div class="table-wrap"><table class="table"><thead><tr><th>User</th><th>Role</th><th>Grade</th><th>Class</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead><tbody>${arr.map(u=>`<tr><td><b>${esc(u.name)}</b><div class="muted">${u.id}</div></td><td><span class="badge blue">${esc(u.role)}</span></td><td>${esc(u.assignedGrade)}</td><td>${esc(u.assignedClass)}</td><td>${esc(u.email)}</td><td><span class="badge ${u.status==="Active"?"":"red"}">${u.status}</span></td><td><button class="btn btn-soft" onclick="editUser('${u.id}')">Edit Access</button> <button class="btn btn-danger" onclick="resetUserPassword('${u.id}')">Generate Password</button></td></tr>`).join("")}</tbody></table></div>`}
+function userTable(arr){return `<div class="table-wrap"><table class="table"><thead><tr><th>User</th><th>Role</th><th>Grade</th><th>Class</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead><tbody>${arr.map(u=>`<tr><td><b>${esc(u.name)}</b><div class="muted">${esc(u.id)}</div></td><td><span class="badge blue">${esc(u.role)}</span></td><td>${esc(u.assignedGrade)}</td><td>${esc(u.assignedClass)}</td><td>${esc(u.email)}</td><td><span class="badge ${u.status==="Active"?"":"red"}">${esc(u.status)}</span></td><td><button class="btn btn-soft" onclick="editUser('${esc(u.id)}')">Edit Access</button> <button class="btn btn-blue" onclick="resetUserPassword('${esc(u.id)}')">Generate Password</button> <button class="btn btn-danger user-remove" onclick="removeUser('${esc(u.id)}')">Remove</button></td></tr>`).join("")||`<tr><td colspan="7"><div class="empty">No users match your search.</div></td></tr>`}</tbody></table></div>`}
 function filterUsers(){let q=(userQ.value||"").toLowerCase(),r=userRole.value;usersTable.innerHTML=userTable(db.users.filter(u=>(u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q))&&(!r||u.role===r)))}
 function learners(){
  const ls=assignedLearners();
@@ -194,6 +194,14 @@ function saveUser(id){
  save();closeModal();render("users");
 }
 function editUser(id){openUser(db.users.find(u=>u.id===id))}
+function removeUser(id){
+ if(me().role!=="Admin")return toast("Administrator access required");
+ const user=db.users.find(x=>x.id===id);if(!user)return toast("User account not found");
+ if(id===me().id)return toast("You cannot remove the account you are using");
+ if(user.role==="Admin"&&user.status==="Active"&&db.users.filter(x=>x.role==="Admin"&&x.status==="Active").length<=1)return toast("At least one active administrator account must remain");
+ if(!confirm(`Remove access for ${user.name} (${user.email})? Learner records will be kept.`))return;
+ db.users=db.users.filter(x=>x.id!==id);save();render("users");toast("User access removed; learner records were kept");
+}
 function resetUserPassword(id){let u=db.users.find(x=>x.id===id);let p=generatePassword();u.password=p;save();openModal("New Temporary Password",`<p><b>${esc(u.name)}</b></p><p class="muted">Give this temporary password securely to the user. The user should change it after signing in.</p><div class="password-row"><input class="input" readonly value="${p}" id="tempPass"><button class="btn btn-blue" onclick="navigator.clipboard?.writeText(tempPass.value);toast('Password copied')">Copy</button></div><button class="btn btn-primary btn-full" onclick="closeModal()">Done</button>`)}
 function changePassword(){
  openModal("Change My Password",`<p class="muted">For security, enter your current password and create a new password.</p><div class="field"><label>Current password</label><input id="oldPass" class="input" type="password"></div><div class="field"><label>New password</label><input id="newPass" class="input" type="password"></div><div class="field"><label>Confirm new password</label><input id="confirmPass" class="input" type="password"></div><button class="btn btn-primary btn-full" onclick="savePassword()">Change Password</button>`);
@@ -213,4 +221,5 @@ function uploadFile(){let f=upFile.files[0];if(!f)return toast("Select a file");
 function runBackup(){db.backup={last:"Today, "+new Date().toLocaleTimeString("en-ZA",{hour:"2-digit",minute:"2-digit"}),status:"Completed",used:"2.5 GB / 10 GB",percent:83};save();render("backup");toast("Cloud backup completed")}
 function saveSettings(){db.school.name=schoolName.value||db.school.name;db.school.motto=schoolMotto.value||db.school.motto;save();toast("Settings saved");render("settings")}
 login();
+
 
