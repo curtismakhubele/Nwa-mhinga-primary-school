@@ -3,8 +3,11 @@ const express = require("express");
 const helmet = require("helmet");
 const multer = require("multer");
 const crypto = require("node:crypto");
+const { spawn } = require("node:child_process");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const ffmpegPath = require("ffmpeg-static");
+const sharp = require("sharp");
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -17,8 +20,8 @@ const totalMediaLimitBytes = Number(process.env.SCHOOL_MEDIA_LIMIT_BYTES || 600 
 const sessionLifetimeMs = 8 * 60 * 60 * 1000;
 const sessions = new Map();
 const extensionMimeTypes = {
-  ".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",".gif":"image/gif",".avif":"image/avif",".bmp":"image/bmp",".tif":"image/tiff",".tiff":"image/tiff",".heic":"image/heic",".heif":"image/heif",
-  ".mp4":"video/mp4",".m4v":"video/mp4",".webm":"video/webm",".ogv":"video/ogg",".mov":"video/quicktime",".mkv":"video/x-matroska",".avi":"video/x-msvideo",".wmv":"video/x-ms-wmv",".mpg":"video/mpeg",".mpeg":"video/mpeg",".3gp":"video/3gpp",".3g2":"video/3gpp2",
+  ".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",".gif":"image/gif",".avif":"image/avif",".bmp":"image/bmp",".tif":"image/tiff",".tiff":"image/tiff",".heic":"image/heic",".heif":"image/heif",".svg":"image/svg+xml",
+  ".mp4":"video/mp4",".m4v":"video/mp4",".webm":"video/webm",".ogv":"video/ogg",".mov":"video/quicktime",".mkv":"video/x-matroska",".avi":"video/x-msvideo",".wmv":"video/x-ms-wmv",".asf":"video/x-ms-asf",".flv":"video/x-flv",".mpg":"video/mpeg",".mpeg":"video/mpeg",".m2v":"video/mpeg",".vob":"video/mpeg",".3gp":"video/3gpp",".3g2":"video/3gpp2",".ts":"video/mp2t",".mts":"video/mp2t",".m2ts":"video/mp2t",
   ".mp3":"audio/mpeg",".m4a":"audio/mp4",".aac":"audio/aac",".wav":"audio/wav",".flac":"audio/flac",".ogg":"audio/ogg",".oga":"audio/ogg",".weba":"audio/webm",
   ".pdf":"application/pdf",".doc":"application/msword",".docx":"application/vnd.openxmlformats-officedocument.wordprocessingml.document",".docm":"application/vnd.ms-word.document.macroEnabled.12",
   ".xls":"application/vnd.ms-excel",".xlsx":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",".xlsm":"application/vnd.ms-excel.sheet.macroEnabled.12",
@@ -30,6 +33,7 @@ const allowedTypes = new Set(Object.values(extensionMimeTypes));
 const mediaKinds = new Set(["Photo", "Video", "Audio", "Document", "Lesson", "Announcement", "News"]);
 let state = { items: [], schoolData: null, admissions: [] };
 let writeQueue = Promise.resolve();
+const previewJobs = new Map();
 
 function appSetting(name) {
   const direct = process.env[name];
@@ -101,12 +105,72 @@ async function directoryBytes(dir) {
 }
 function safePublicItem(item) {
   const { id, type, title, description, filename, originalName, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate } = item;
-  return { id, type, title, description, filename, originalName, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate, fileUrl: item.filename ? "/api/media/" + encodeURIComponent(id) : "" };
+  const mediaUrl = item.filename ? "/api/media/" + encodeURIComponent(id) : "";
+  return {
+    id, type, title, description, filename, originalName, mimeType, size, createdAt, published, grade, subject, teacher, lessonDate,
+    fileUrl: mediaUrl,
+    previewUrl: mediaUrl && String(mimeType || "").startsWith("image/") ? mediaUrl + "/preview" : "",
+    previewVideoUrl: mediaUrl && String(mimeType || "").startsWith("video/") ? mediaUrl + "/preview-video" : "",
+    posterUrl: mediaUrl && String(mimeType || "").startsWith("video/") ? mediaUrl + "/poster" : ""
+  };
 }
 function uploadedMimeType(file) {
   const supplied = String(file.mimetype || "").toLowerCase();
   if (allowedTypes.has(supplied)) return supplied;
   return extensionMimeTypes[path.extname(String(file.originalname || "")).toLowerCase()] || "";
+}
+function runFfmpeg(args, timeoutMs = 240000) {
+  if (!ffmpegPath) return Promise.reject(new Error("Video preview encoder is unavailable."));
+  return new Promise((resolve, reject) => {
+    const child = spawn(ffmpegPath, ["-hide_banner", "-loglevel", "error", "-y", ...args], { stdio: ["ignore", "ignore", "pipe"] });
+    let errorOutput = "";
+    const timeout = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    child.stderr.on("data", chunk => { errorOutput = (errorOutput + chunk.toString()).slice(-2000); });
+    child.once("error", error => { clearTimeout(timeout); reject(error); });
+    child.once("close", code => {
+      clearTimeout(timeout);
+      if (code === 0) resolve();
+      else reject(new Error(errorOutput || "Video preview conversion failed."));
+    });
+  });
+}
+async function ensureVideoPreview(item) {
+  if (item.previewVideoFilename) {
+    try {
+      await fs.access(path.join(mediaRoot, item.previewVideoFilename));
+      return item;
+    } catch {}
+  }
+  if (previewJobs.has(item.id)) return previewJobs.get(item.id);
+  const job = (async () => {
+    const source = path.join(mediaRoot, item.filename);
+    const videoName = item.id + "-preview.mp4";
+    const posterName = item.id + "-poster.jpg";
+    const videoPath = path.join(mediaRoot, videoName);
+    const posterPath = path.join(mediaRoot, posterName);
+    await runFfmpeg([
+      "-i", source, "-map", "0:v:0", "-map", "0:a:0?", "-vf", "scale='min(1280,iw)':'min(1280,ih)':force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2",
+      "-c:v", "libx264", "-preset", "ultrafast", "-crf", "29", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", "96k", "-threads", "1", "-movflags", "+faststart", "-f", "mp4", videoPath
+    ]);
+    try {
+      await runFfmpeg(["-ss", "1", "-i", videoPath, "-frames:v", "1", "-vf", "scale=960:540:force_original_aspect_ratio=decrease", "-q:v", "4", posterPath]);
+      item.previewPosterFilename = posterName;
+    } catch (err) {
+      await fs.rm(posterPath, { force: true });
+      console.warn("Video poster generation skipped:", err.message);
+    }
+    if (await directoryBytes(mediaRoot) > totalMediaLimitBytes) {
+      await Promise.all([fs.rm(videoPath, { force: true }), fs.rm(posterPath, { force: true })]);
+      delete item.previewVideoFilename;
+      delete item.previewPosterFilename;
+      throw new Error("There is not enough school media storage to create a video preview. Remove older media and retry.");
+    }
+    item.previewVideoFilename = videoName;
+    return item;
+  })().finally(() => previewJobs.delete(item.id));
+  previewJobs.set(item.id, job);
+  return job;
 }
 
 const storage = multer.memoryStorage();
@@ -252,6 +316,17 @@ app.post("/api/admin/media", requireAdmin, upload.single("file"), async (req, re
     }
     const originalName = req.file ? path.basename(String(req.file.originalname || "uploaded-file")).replace(/[\\/:*?"<>|\x00-\x1f]/g, "_").slice(0, 180) : "";
     const item = { id, type, title, description, grade, subject, teacher, lessonDate, filename, originalName, mimeType, size: req.file?.size || 0, createdAt: new Date().toISOString(), published };
+    if (mimeType.startsWith("video/")) {
+      try { await ensureVideoPreview(item); }
+      catch (err) {
+        await Promise.all([
+          fs.rm(path.join(mediaRoot, filename), { force: true }),
+          fs.rm(path.join(mediaRoot, id + "-preview.mp4"), { force: true }),
+          fs.rm(path.join(mediaRoot, id + "-poster.jpg"), { force: true })
+        ]);
+        return sendError(res, 415, "This video could not be converted for in-app preview. Try exporting it as MP4 or WebM.");
+      }
+    }
     state.items.unshift(item);
     await saveState();
     res.status(201).json(safePublicItem(item));
@@ -263,8 +338,56 @@ app.delete("/api/admin/media/:id", requireAdmin, async (req, res, next) => {
     if (!item) return sendError(res, 404, "Post not found.");
     state.items = state.items.filter(x => x.id !== item.id);
     await saveState();
-    if (item.filename) await fs.rm(path.join(mediaRoot, item.filename), { force: true });
+    for (const filename of [item.filename, item.previewVideoFilename, item.previewPosterFilename]) {
+      if (filename) await fs.rm(path.join(mediaRoot, filename), { force: true });
+    }
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+app.get("/api/media/:id/preview", async (req, res, next) => {
+  try {
+    const item = state.items.find(x => x.id === req.params.id && x.published && x.filename && String(x.mimeType || "").startsWith("image/"));
+    if (!item) return res.sendStatus(404);
+    const source = path.join(mediaRoot, item.filename);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    if (item.mimeType === "image/gif") {
+      res.type("image/gif");
+      return res.sendFile(source);
+    }
+    const preview = await sharp(source, { limitInputPixels: 40000000, failOn: "warning" })
+      .rotate()
+      .resize({ width: 1600, height: 1200, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 84 })
+      .toBuffer();
+    res.type("image/webp").send(preview);
+  } catch (err) { next(err); }
+});
+app.get("/api/media/:id/preview-video", async (req, res, next) => {
+  try {
+    const item = state.items.find(x => x.id === req.params.id && x.published && x.filename && String(x.mimeType || "").startsWith("video/"));
+    if (!item) return res.sendStatus(404);
+    const wasGenerated = !!item.previewVideoFilename;
+    try { await ensureVideoPreview(item); }
+    catch (err) { return sendError(res, 415, "Video preview conversion failed. Re-export as MP4 or WebM and upload again."); }
+    if (!wasGenerated) await saveState();
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.type("video/mp4").sendFile(path.join(mediaRoot, item.previewVideoFilename));
+  } catch (err) { next(err); }
+});
+app.get("/api/media/:id/poster", async (req, res, next) => {
+  try {
+    const item = state.items.find(x => x.id === req.params.id && x.published && x.filename && String(x.mimeType || "").startsWith("video/"));
+    if (!item) return res.sendStatus(404);
+    const wasGenerated = !!item.previewVideoFilename;
+    try { await ensureVideoPreview(item); }
+    catch (err) { return sendError(res, 415, "Video preview is unavailable for this file."); }
+    if (!wasGenerated) await saveState();
+    if (!item.previewPosterFilename) return res.sendStatus(404);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.type("image/jpeg").sendFile(path.join(mediaRoot, item.previewPosterFilename));
   } catch (err) { next(err); }
 });
 app.get("/api/media/:id", async (req, res, next) => {
@@ -274,7 +397,7 @@ app.get("/api/media/:id", async (req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Cache-Control", "public, max-age=300");
     if (item.mimeType === "application/pdf") res.setHeader("Content-Disposition", "inline; filename=\"" + path.basename(item.filename) + "\"");
-    else if (!item.mimeType.startsWith("image/") && !item.mimeType.startsWith("video/") && !item.mimeType.startsWith("audio/")) {
+    else if (item.mimeType === "image/svg+xml" || (!item.mimeType.startsWith("image/") && !item.mimeType.startsWith("video/") && !item.mimeType.startsWith("audio/"))) {
       res.attachment(item.originalName || path.basename(item.filename));
     }
     res.type(item.mimeType);

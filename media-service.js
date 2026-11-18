@@ -19,13 +19,17 @@ function portalUrl(value) {
 }
 function remoteMediaCard(p, admin) {
   const url = portalUrl(p.fileUrl || p.url || "");
+  const imagePreviewUrl = portalUrl(p.previewUrl || "") || url;
+  const videoPreviewUrl = portalUrl(p.previewVideoUrl || "") || url;
+  const posterUrl = portalUrl(p.posterUrl || "");
   const mime = String(p.mimeType || "").toLowerCase();
+  const videoMime = p.previewVideoUrl ? "video/mp4" : mime;
   const fileName = p.originalName || p.filename || "Uploaded file";
   const fileSize = Number(p.size || 0);
   const sizeLabel = fileSize ? (fileSize >= 1048576 ? (fileSize / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(fileSize / 1024)) + " KB") : "";
   let media = "";
-  if (url && mime.startsWith("image/")) media = '<img loading="lazy" src="' + url + '" alt="' + esc(p.title) + '" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><a class="media-file-link" hidden href="' + url + '" download="' + esc(fileName) + '">Image preview unavailable — download ' + esc(fileName) + '</a>';
-  else if (url && mime.startsWith("video/")) media = '<video controls playsinline preload="metadata"><source src="' + url + '" type="' + esc(mime) + '">Your browser cannot play this video.</video><a class="media-file-link" href="' + url + '" download="' + esc(fileName) + '">Download video if playback is unavailable</a>';
+  if (url && mime.startsWith("image/")) media = '<img loading="lazy" src="' + imagePreviewUrl + '" alt="' + esc(p.title) + '" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><a class="media-file-link" hidden href="' + url + '" download="' + esc(fileName) + '">Image preview unavailable — download ' + esc(fileName) + '</a>';
+  else if (url && mime.startsWith("video/")) media = '<video controls playsinline preload="metadata"' + (posterUrl ? ' poster="' + posterUrl + '"' : '') + '><source src="' + videoPreviewUrl + '" type="' + esc(videoMime) + '">Your browser cannot play this video.</video><a class="media-file-link" href="' + url + '" download="' + esc(fileName) + '">Download original video</a>';
   else if (url && mime.startsWith("audio/")) media = '<audio controls preload="metadata"><source src="' + url + '" type="' + esc(mime) + '">Your browser cannot play this audio.</audio><a class="media-file-link" href="' + url + '" download="' + esc(fileName) + '">Download audio</a>';
   else if (url && mime === "application/pdf") media = '<iframe class="media-document" loading="lazy" title="' + esc(p.title) + '" src="' + url + '"></iframe><div class="media-file-details"><span>PDF · ' + esc(fileName) + (sizeLabel ? ' · ' + sizeLabel : '') + '</span><a class="media-file-link" href="' + url + '" download="' + esc(fileName) + '">Download PDF</a></div>';
   else if (url) media = '<div class="media-document-card"><span class="media-document-icon">' + esc((fileName.split(".").pop() || "FILE").toUpperCase()) + '</span><div><b>' + esc(fileName) + '</b><small>' + esc(mime || "Document") + (sizeLabel ? ' · ' + sizeLabel : '') + '</small></div><a class="media-file-link" href="' + url + '" download="' + esc(fileName) + '">Download file</a></div>';
@@ -108,8 +112,8 @@ window.mediaAdmin = function() {
     '<div class="field"><label for="mediaTeacher">Teacher</label><input id="mediaTeacher" class="input" maxlength="100" placeholder="Teacher name"></div>' +
     '<div class="field"><label for="mediaLessonDate">Lesson date</label><input id="mediaLessonDate" class="input" type="date" value="' + new Date().toISOString().slice(0,10) + '"></div>' +
     '<div class="field wide"><label for="mediaDescription">Description / announcement</label><textarea id="mediaDescription" class="input" maxlength="1000"></textarea></div>' +
-    '<div class="field wide"><label for="mediaFile">Upload a file (max 50 MB)</label><input id="mediaFile" class="input" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.bmp,.tif,.tiff,.heic,.heif,.mp4,.m4v,.webm,.ogv,.mov,.mkv,.avi,.wmv,.mpg,.mpeg,.3gp,.3g2,.mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.weba,.pdf,.doc,.docx,.docm,.xls,.xlsx,.xlsm,.ppt,.pptx,.pptm,.odt,.ods,.odp,.rtf,.txt,.csv"></div></div>' +
-    '<p class="muted">Supports common JPG, PNG, WebP, GIF, AVIF, BMP, TIFF and HEIC images; MP4, WebM, MOV, MKV, AVI and other common video; PDF, Word, Excel, PowerPoint, OpenDocument, RTF, CSV and text documents; and common audio formats. Browser-compatible images, audio and video preview here; other formats show an open/download card.</p><button class="btn btn-primary" onclick="publishMedia()">Publish</button></div>' +
+    '<div class="field wide"><label for="mediaFile">Upload a file (max 50 MB)</label><input id="mediaFile" class="input" type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.bmp,.tif,.tiff,.heic,.heif,.svg,.mp4,.m4v,.webm,.ogv,.mov,.mkv,.avi,.wmv,.asf,.flv,.mpg,.mpeg,.m2v,.vob,.3gp,.3g2,.ts,.mts,.m2ts,.mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.weba,.pdf,.doc,.docx,.docm,.xls,.xlsx,.xlsm,.ppt,.pptx,.pptm,.odt,.ods,.odp,.rtf,.txt,.csv"></div></div>' +
+    '<p class="muted">Images are converted to a browser preview; uploaded videos receive an in-app MP4 preview and poster. Original uploads stay available to download.</p><button class="btn btn-primary" onclick="publishMedia()">Publish</button></div>' +
     '<div id="media-admin-list" style="margin-top:16px"><div class="card empty">Loading school posts…</div></div>';
 };
 window.mediaTypeChanged = function() {
