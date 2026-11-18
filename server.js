@@ -255,7 +255,41 @@ app.put("/api/admin/data", requireAdmin, async (req, res, next) => {
     res.json({ ok: true, savedAt: new Date().toISOString() });
   } catch (err) { next(err); }
 });
-app.get("/api/admin/admissions", requireAdmin, (_req, res) => res.json({ items: state.admissions || [] }));
+app.get("/api/admin/admissions", requireAdmin, (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ items: (state.admissions || []).map(({ reference, learner, status, receivedAt, submittedAt }) => ({ reference, learner, status, receivedAt, submittedAt })) });
+});
+app.get("/api/admin/admissions/:reference", requireAdmin, (req, res) => {
+  const record = (state.admissions || []).find(x => x.reference === req.params.reference);
+  if (!record) return sendError(res, 404, "Application not found.");
+  res.set("Cache-Control", "no-store");
+  res.json(record);
+});
+app.patch("/api/admin/admissions/:reference", requireAdmin, async (req, res, next) => {
+  try {
+    const record = (state.admissions || []).find(x => x.reference === req.params.reference);
+    if (!record) return sendError(res, 404, "Application not found.");
+    const { learner, application, status, adminNotes } = req.body || {};
+    if (!learner || typeof learner !== "object" || Array.isArray(learner) || !application || typeof application !== "object" || Array.isArray(application)) return sendError(res, 400, "Learner and application fields must be valid objects.");
+    if (JSON.stringify({ learner, application }).length > 2 * 1024 * 1024) return sendError(res, 413, "Edited application fields are too large.");
+    if (typeof status !== "string" || status.length > 80 || typeof adminNotes !== "string" || adminNotes.length > 4000) return sendError(res, 400, "Status or admin notes are invalid.");
+    record.learner = learner;
+    record.application = application;
+    record.status = status.trim() || "Received by school";
+    record.adminNotes = adminNotes;
+    record.updatedAt = new Date().toISOString();
+    await saveState();
+    res.set("Cache-Control", "no-store");
+    res.json({ ok: true, updatedAt: record.updatedAt });
+  } catch (err) { next(err); }
+});
+app.get("/api/admin/admissions/:reference/download", requireAdmin, (req, res) => {
+  const record = (state.admissions || []).find(x => x.reference === req.params.reference);
+  if (!record) return sendError(res, 404, "Application not found.");
+  res.set("Cache-Control", "no-store");
+  res.set("Content-Disposition", `attachment; filename="${record.reference}.json"`);
+  res.type("application/json").send(JSON.stringify(record, null, 2));
+});
 app.post("/api/public/admissions", async (req, res, next) => {
   try {
     const record = req.body;
