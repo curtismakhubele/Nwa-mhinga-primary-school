@@ -30,6 +30,8 @@ linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("school-bg.svg") 
 .media-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:16px}
 .media-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
 .media-card img,.media-card video{display:block;width:100%;max-height:220px;object-fit:cover;border-radius:8px;background:#0a1924}
+.media-card video{object-fit:contain}
+.media-document{display:block;width:100%;height:260px;border:0;border-radius:8px;background:#f6f8fb}
 .media-card h3{font-size:15px;margin:10px 0 4px}
 .media-card p{font-size:13px}
 .media-card .btn{margin-top:6px}
@@ -75,4 +77,7 @@ linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("school-bg.svg") 
 @keyframes portal-shimmer{to{background-position-x:-220%}}
 @media(max-width:520px){.loader-card{padding:30px 22px 24px}.loader-logo{width:72px;height:72px}.loader-card h1{font-size:19px}}
 @media(prefers-reduced-motion:reduce){.portal-loader,.loader-spinner,.loader-skeleton i{animation:none;transition:none}}
+.dashboard-news .media-card video{grid-row:auto;grid-column:1/-1;width:100%;height:auto;max-height:220px;object-fit:contain}
+.dashboard-news .media-document{grid-column:1/-1;grid-row:auto;height:180px}
+
 

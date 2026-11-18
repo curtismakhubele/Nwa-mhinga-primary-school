@@ -19,13 +19,13 @@ function portalUrl(value) {
 }
 function remoteMediaCard(p, admin) {
   const url = portalUrl(p.fileUrl || p.url || "");
+  const mime = String(p.mimeType || "").toLowerCase();
   let media = "";
-  if (["Photo", "Image", "News", "Announcement"].includes(p.type) && url && String(p.mimeType || "").startsWith("image/")) media = '<img loading="lazy" src="' + url + '" alt="' + esc(p.title) + '">';
-  else if (p.type === "Video" && url) media = '<video controls preload="none" src="' + url + '"></video>';
-  else if (p.type === "Audio" && url) media = '<audio controls preload="none" src="' + url + '"></audio>';
-  else if (["Document", "Lesson"].includes(p.type) && url) media = p.mimeType === "application/pdf"
-    ? '<a class="btn btn-blue" target="_blank" rel="noopener noreferrer" href="' + url + '">Open ' + (p.type === "Lesson" ? "lesson" : "document") + ' PDF</a>'
-    : String(p.mimeType || "").startsWith("audio/") ? '<audio controls preload="none" src="' + url + '"></audio>' : '<video controls preload="none" src="' + url + '"></video>';
+  if (url && mime.startsWith("image/")) media = '<img loading="lazy" src="' + url + '" alt="' + esc(p.title) + '">';
+  else if (url && mime.startsWith("video/")) media = '<video controls playsinline preload="metadata"><source src="' + url + '" type="' + esc(mime) + '">Your browser cannot play this video.</video>';
+  else if (url && mime.startsWith("audio/")) media = '<audio controls preload="metadata"><source src="' + url + '" type="' + esc(mime) + '">Your browser cannot play this audio.</audio>';
+  else if (url && mime === "application/pdf") media = '<iframe class="media-document" loading="lazy" title="' + esc(p.title) + '" src="' + url + '"></iframe><a class="btn btn-blue" target="_blank" rel="noopener noreferrer" href="' + url + '">Open PDF</a>';
+  else if (url) media = '<a class="btn btn-blue" target="_blank" rel="noopener noreferrer" href="' + url + '">Open uploaded file</a>';
   const lessonInfo = p.type === "Lesson" ? '<small class="muted lesson-meta">' + [p.grade, p.subject, p.teacher, p.lessonDate].filter(Boolean).map(esc).join(" · ") + '</small>' : "";
   return '<article class="media-card">' + media + '<h3>' + esc(p.title) + '</h3><p>' + esc(p.description || "") + '</p>' + lessonInfo + '<small class="muted">' + esc(p.createdAt || "") + '</small>' +
     (admin ? '<button class="btn btn-danger" onclick="removeMedia(\'' + esc(p.id) + '\')">Remove</button>' : '') + '</article>';
@@ -87,8 +87,7 @@ function drawAdminMedia() {
   const posts = mediaRemotePosts.filter(p => mediaAdminView === "All" || p.type === mediaAdminView);
   const lessons = posts.filter(p => p.type === "Lesson");
   const body = mediaAdminView === "Lesson"
-    ? '<div class="table-wrap"><table class="table"><thead><tr><th>Title</th><th>Grade</th><th>Subject</th><th>Teacher</th><th>Date</th><th></th></tr></thead><tbody>' +
-      (lessons.map(p => '<tr><td><b>' + esc(p.title) + '</b><div class="muted">' + esc(p.description || "") + '</div></td><td>' + esc(p.grade || "—") + '</td><td>' + esc(p.subject || "—") + '</td><td>' + esc(p.teacher || "—") + '</td><td>' + esc(p.lessonDate || "—") + '</td><td><button class="btn btn-danger" onclick="removeMedia(\'' + esc(p.id) + '\')">Delete</button></td></tr>').join("") || '<tr><td colspan="6" class="empty">No lessons published yet.</td></tr>') + '</tbody></table></div>'
+    ? '<div class="media-grid">' + (lessons.map(p => remoteMediaCard(p, true)).join("") || '<div class="card empty">No lessons published yet.</div>') + '</div>'
     : '<div class="media-grid">' + (posts.map(p => remoteMediaCard(p, true)).join("") || '<div class="card empty">No ' + (mediaAdminView === "All" ? "school posts" : esc(mediaAdminView.toLowerCase() + " posts")) + ' yet.</div>') + '</div>';
   host.innerHTML = '<div class="media-storage-line">Storage used: ' + (mediaUsedBytes / 1048576).toFixed(1) + ' MB / ' + (mediaLimitBytes / 1048576).toFixed(0) + ' MB</div><div class="filter-bar media-filters">' +
     kinds.map(k => '<button class="filter-btn ' + (mediaAdminView === k ? 'active' : '') + '" onclick="setMediaAdminView(\'' + k + '\')">' + k + (k === "Lesson" ? ' · ' + mediaRemotePosts.filter(p => p.type === "Lesson").length : '') + '</button>').join("") + '</div>' + body;
@@ -233,4 +232,5 @@ function dismissPortalLoader() {
   window.setTimeout(() => loader.remove(), 450);
 }
 initializeMediaApp();
+
 
