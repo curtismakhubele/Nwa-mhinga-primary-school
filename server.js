@@ -31,7 +31,7 @@ const extensionMimeTypes = {
 };
 const allowedTypes = new Set(Object.values(extensionMimeTypes));
 const mediaKinds = new Set(["Photo", "Video", "Audio", "Document", "Lesson", "Announcement", "News"]);
-let state = { items: [], schoolData: null, admissions: [] };
+let state = { items: [], schoolData: null, admissions: [], users: [] };
 let writeQueue = Promise.resolve();
 const previewJobs = new Map();
 
@@ -72,7 +72,7 @@ function cookieValue(req, name) {
   const match = header.split(";").map(x => x.trim()).find(x => x.startsWith(name + "="));
   return match ? decodeURIComponent(match.slice(name.length + 1)) : "";
 }
-function currentAdmin(req) {
+function currentUser(req) {
   const token = cookieValue(req, "nwa_admin_session");
   const entry = sessions.get(token);
   if (!entry || entry.expiresAt < Date.now()) {
@@ -82,9 +82,39 @@ function currentAdmin(req) {
   entry.expiresAt = Date.now() + sessionLifetimeMs;
   return entry;
 }
-function requireAdmin(req, res, next) {
-  if (!currentAdmin(req)) return sendError(res, 401, "Administrator sign-in required.");
+function requireAuth(req, res, next) {
+  const user = currentUser(req);
+  if (!user) return sendError(res, 401, "Sign-in required.");
+  req.schoolUser = user.user;
   next();
+}
+function requireAdmin(req, res, next) {
+  const user = currentUser(req);
+  if (!user) return sendError(res, 401, "Administrator sign-in required.");
+  if (user.user.role !== "Admin") return sendError(res, 403, "Administrator access required.");
+  req.schoolUser = user.user;
+  next();
+}
+function requireSchoolManager(req, res, next) {
+  const user = currentUser(req);
+  if (!user) return sendError(res, 401, "School account sign-in required.");
+  if (!["Admin", "Principal"].includes(user.user.role)) return sendError(res, 403, "Principal or administrator access required.");
+  req.schoolUser = user.user;
+  next();
+}
+const userRoles = new Set(["Admin", "Principal", "Vice Principal", "Teacher", "Parent", "Learner"]);
+function publicUser(user) {
+  const { passwordHash, passwordSalt, ...safe } = user;
+  return safe;
+}
+function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
+  return { salt, hash: crypto.scryptSync(password, salt, 64).toString("hex") };
+}
+function passwordMatches(password, user) {
+  if (!user.passwordHash || !user.passwordSalt) return false;
+  const actual = crypto.scryptSync(password, user.passwordSalt, 64);
+  const expected = Buffer.from(user.passwordHash, "hex");
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 async function saveState() {
   writeQueue = writeQueue.then(async () => {
@@ -181,8 +211,9 @@ const upload = multer({
 
 app.get("/api/health", (_req, res) => res.json({ status: "ok", storageLimitBytes: totalMediaLimitBytes }));
 app.get("/api/admin/session", (req, res) => {
-  const admin = currentAdmin(req);
-  res.json({ authenticated: !!admin, email: admin?.email || null });
+  const user = currentUser(req);
+  res.set("Cache-Control", "no-store");
+  res.json({ authenticated: !!user, user: user ? publicUser(user.user) : null });
 });
 app.post("/api/admin/login", (req, res) => {
   const configuredAdmins = [
@@ -190,8 +221,8 @@ app.post("/api/admin/login", (req, res) => {
     { email: appSetting("SCHOOL_ADMIN_TEST_EMAIL").trim().toLowerCase(), password: appSetting("SCHOOL_ADMIN_TEST_PASSWORD").trim() }
   ].filter(admin => admin.email && admin.password);
   const email = String(req.body?.email || "").trim().toLowerCase();
-  const password = String(req.body?.password || "").trim();
-  if (!configuredAdmins.length) {
+  const password = String(req.body?.password || "");
+  if (!configuredAdmins.length && !Array.isArray(state.users)) {
     return sendError(res, 503, "Admin sign-in is not configured. Add administrator credentials in App Service settings.");
   }
   const provided = Buffer.from(password);
@@ -200,17 +231,109 @@ app.post("/api/admin/login", (req, res) => {
     const equalPassword = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
     return email === admin.email && equalPassword;
   });
-  if (!matchedAdmin) return sendError(res, 401, "Invalid administrator credentials. Use an admin account configured in this App Service.");
+  const account = matchedAdmin ? null : (state.users || []).find(user => user.email === email && user.status === "Active" && passwordMatches(password, user));
+  if (!matchedAdmin && !account) return sendError(res, 401, "Invalid email or password, or this account is inactive.");
+  const signedInUser = account ? publicUser(account) : {
+    id: "server-admin", name: "School Administrator", email: matchedAdmin.email, role: "Admin",
+    assignedGrade: "All", assignedClass: "All", status: "Active"
+  };
   const token = crypto.randomBytes(32).toString("base64url");
-  sessions.set(token, { email: matchedAdmin.email, expiresAt: Date.now() + sessionLifetimeMs });
+  sessions.set(token, { user: signedInUser, expiresAt: Date.now() + sessionLifetimeMs });
   res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
-  res.json({ authenticated: true, email: matchedAdmin.email, role: "Admin" });
+  res.set("Cache-Control", "no-store");
+  res.json({ authenticated: true, user: signedInUser });
 });
-app.post("/api/admin/logout", requireAdmin, (req, res) => {
+app.post("/api/admin/logout", requireAuth, (req, res) => {
   const token = cookieValue(req, "nwa_admin_session");
   sessions.delete(token);
   res.setHeader("Set-Cookie", "nwa_admin_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0");
   res.json({ ok: true });
+});
+
+app.get("/api/admin/users", requireAdmin, (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ users: (state.users || []).map(publicUser) });
+});
+app.post("/api/admin/users/migrate", requireAdmin, async (req, res, next) => {
+  try {
+    const rows = Array.isArray(req.body?.users) ? req.body.users.slice(0, 250) : [];
+    const existing = new Set((state.users || []).map(user => user.email));
+    let imported = 0, skipped = 0;
+    for (const row of rows) {
+      const email = String(row.email || "").trim().toLowerCase();
+      const name = String(row.name || "").trim();
+      const password = String(row.password || "");
+      if (!name || name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !userRoles.has(row.role) || !["Active", "Suspended"].includes(row.status) || password.length < 8 || password.length > 256 || existing.has(email)) { skipped++; continue; }
+      const { salt, hash } = hashPassword(password);
+      state.users.push({ id: "U" + crypto.randomBytes(6).toString("hex"), name, email, role: row.role, status: row.status, assignedGrade: String(row.assignedGrade || "All"), assignedClass: String(row.assignedClass || "All"), learnerId: String(row.learnerId || ""), passwordSalt: salt, passwordHash: hash });
+      existing.add(email); imported++;
+    }
+    if (imported) await saveState();
+    res.json({ imported, skipped, users: (state.users || []).map(publicUser) });
+  } catch (err) { next(err); }
+});
+app.post("/api/admin/users", requireAdmin, async (req, res, next) => {
+  try {
+    const input = req.body || {};
+    const email = String(input.email || "").trim().toLowerCase();
+    const name = String(input.name || "").trim();
+    const password = String(input.password || "");
+    if (!name || name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !userRoles.has(input.role) || !["Active", "Suspended"].includes(input.status) || password.length < 8 || password.length > 256) return sendError(res, 400, "Enter a name, valid email, role, status, and password of at least 8 characters.");
+    if ((state.users || []).some(user => user.email === email)) return sendError(res, 409, "An account with this email already exists.");
+    const { salt, hash } = hashPassword(password);
+    const user = { id: "U" + crypto.randomBytes(6).toString("hex"), name, email, role: input.role, status: input.status, assignedGrade: String(input.assignedGrade || "All"), assignedClass: String(input.assignedClass || "All"), learnerId: String(input.learnerId || ""), passwordSalt: salt, passwordHash: hash };
+    state.users = [...(state.users || []), user];
+    await saveState();
+    res.status(201).json({ user: publicUser(user) });
+  } catch (err) { next(err); }
+});
+app.patch("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const user = (state.users || []).find(row => row.id === req.params.id);
+    if (!user) return sendError(res, 404, "Account not found.");
+    const input = req.body || {};
+    const email = String(input.email || "").trim().toLowerCase();
+    const name = String(input.name || "").trim();
+    if (!name || name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !userRoles.has(input.role) || !["Active", "Suspended"].includes(input.status)) return sendError(res, 400, "Account details are invalid.");
+    if ((state.users || []).some(row => row.id !== user.id && row.email === email)) return sendError(res, 409, "An account with this email already exists.");
+    const password = input.password === undefined ? "" : String(input.password);
+    if (password && (password.length < 8 || password.length > 256)) return sendError(res, 400, "Password must be at least 8 characters.");
+    Object.assign(user, { name, email, role: input.role, status: input.status, assignedGrade: String(input.assignedGrade || "All"), assignedClass: String(input.assignedClass || "All"), learnerId: String(input.learnerId || "") });
+    if (password) {
+      const { salt, hash } = hashPassword(password);
+      user.passwordSalt = salt; user.passwordHash = hash;
+    }
+    await saveState();
+    for (const [token, session] of sessions) if (session.user.id === req.params.id) sessions.delete(token);
+    res.json({ user: publicUser(user) });
+  } catch (err) { next(err); }
+});
+app.delete("/api/admin/users/:id", requireAdmin, async (req, res, next) => {
+  try {
+    if (req.params.id === req.schoolUser.id) return sendError(res, 400, "You cannot remove your own account.");
+    const before = state.users || [];
+    state.users = before.filter(user => user.id !== req.params.id);
+    if (state.users.length === before.length) return sendError(res, 404, "Account not found.");
+    await saveState();
+    for (const [token, session] of sessions) if (session.user.id === req.params.id) sessions.delete(token);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+app.post("/api/account/password", requireAuth, async (req, res, next) => {
+  try {
+    const user = (state.users || []).find(row => row.id === req.schoolUser.id);
+    if (!user) return sendError(res, 400, "This administrator password is managed in Azure App Service settings.");
+    const currentPassword = String(req.body?.currentPassword || "");
+    const newPassword = String(req.body?.newPassword || "");
+    if (!passwordMatches(currentPassword, user)) return sendError(res, 401, "Current password is incorrect.");
+    if (newPassword.length < 8 || newPassword.length > 256) return sendError(res, 400, "New password must be at least 8 characters.");
+    const { salt, hash } = hashPassword(newPassword);
+    user.passwordSalt = salt; user.passwordHash = hash;
+    await saveState();
+    for (const [token, session] of sessions) if (session.user.id === user.id) sessions.delete(token);
+    res.set("Set-Cookie", "nwa_admin_session=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0");
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 // Remove only the known bundled sample rows from existing app storage.
@@ -230,18 +353,44 @@ function cleanLegacyDemoSchoolData(data) {
   return clean;
 }
 // Shared school records for the F1 prototype. This is persistent app storage, not a database.
-app.get("/api/admin/data", requireAdmin, async (_req, res, next) => {
+function learnerInUserScope(learner, user) {
+  if (["Admin", "Principal"].includes(user.role)) return true;
+  if (user.role === "Vice Principal") {
+    if (user.assignedGrade === "All") return true;
+    if (user.assignedGrade === "Grade 4-7") return /^Grade [4-7]$/.test(learner.grade || "");
+    return learner.grade === user.assignedGrade;
+  }
+  if (user.role === "Teacher") return learner.grade === user.assignedGrade && learner.class === user.assignedClass;
+  return !!user.learnerId && learner.id === user.learnerId;
+}
+function recordInUserScope(record, user) {
+  if (["Admin", "Principal"].includes(user.role)) return true;
+  if (record.learnerId) return learnerInUserScope((state.schoolData?.learners || []).find(x => x.id === record.learnerId) || { id: record.learnerId }, user);
+  return false;
+}
+app.get("/api/admin/data", requireAuth, async (req, res, next) => {
   try {
-    if (!state.schoolData) return res.json({ initialized: false });
+    if (!state.schoolData) return res.json({ initialized: false, learners: [], assessments: [], learnerAttendance: [], learnerReports: [], docs: [] });
     const clean = cleanLegacyDemoSchoolData(state.schoolData);
     if (JSON.stringify(clean) !== JSON.stringify(state.schoolData)) {
       state.schoolData = clean;
       await saveState();
     }
-    res.json({ ...clean, initialized: true });
+    const user = req.schoolUser;
+    if (["Admin", "Principal"].includes(user.role)) return res.json({ ...clean, initialized: true });
+    const visibleLearners = clean.learners.filter(row => learnerInUserScope(row, user));
+    const visibleIds = new Set(visibleLearners.map(row => row.id));
+    res.set("Cache-Control", "no-store");
+    res.json({
+      learners: visibleLearners,
+      assessments: clean.assessments.filter(row => visibleIds.has(row.learnerId)),
+      learnerAttendance: clean.learnerAttendance.filter(row => visibleIds.has(row.learnerId)),
+      learnerReports: clean.learnerReports.filter(row => visibleIds.has(row.learnerId)),
+      docs: [], initialized: true
+    });
   } catch (err) { next(err); }
 });
-app.put("/api/admin/data", requireAdmin, async (req, res, next) => {
+app.put("/api/admin/data", requireAuth, async (req, res, next) => {
   try {
     const input = req.body && typeof req.body === "object" ? req.body : {};
     const clean = {};
@@ -250,22 +399,34 @@ app.put("/api/admin/data", requireAdmin, async (req, res, next) => {
       clean[key] = input[key];
     }
     if (JSON.stringify(clean).length > 6 * 1024 * 1024) return sendError(res, 413, "School records exceed the F1 data limit.");
-    state.schoolData = clean;
+    const user = req.schoolUser;
+    if (["Admin", "Principal"].includes(user.role)) state.schoolData = clean;
+    else {
+      if (!["Vice Principal", "Teacher"].includes(user.role)) return sendError(res, 403, "This account has read-only school record access.");
+      const current = state.schoolData || { learners: [], assessments: [], learnerAttendance: [], learnerReports: [], docs: [] };
+      const learnerIds = new Set((current.learners || []).filter(row => learnerInUserScope(row, user)).map(row => row.id));
+      if (clean.learners.some(row => !learnerInUserScope(row, user)) || ["assessments", "learnerAttendance", "learnerReports"].some(key => clean[key].some(row => !learnerIds.has(row.learnerId)))) return sendError(res, 403, "Changes include records outside this account's assigned scope.");
+      for (const key of ["learners", "assessments", "learnerAttendance", "learnerReports"]) {
+        const inScope = row => key === "learners" ? learnerInUserScope(row, user) : recordInUserScope(row, user);
+        state.schoolData[key] = [...(current[key] || []).filter(row => !inScope(row)), ...clean[key]];
+      }
+      state.schoolData.docs = current.docs || [];
+    }
     await saveState();
     res.json({ ok: true, savedAt: new Date().toISOString() });
   } catch (err) { next(err); }
 });
-app.get("/api/admin/admissions", requireAdmin, (_req, res) => {
+app.get("/api/admin/admissions", requireSchoolManager, (_req, res) => {
   res.set("Cache-Control", "no-store");
   res.json({ items: (state.admissions || []).map(({ reference, learner, status, receivedAt, submittedAt }) => ({ reference, learner, status, receivedAt, submittedAt })) });
 });
-app.get("/api/admin/admissions/:reference", requireAdmin, (req, res) => {
+app.get("/api/admin/admissions/:reference", requireSchoolManager, (req, res) => {
   const record = (state.admissions || []).find(x => x.reference === req.params.reference);
   if (!record) return sendError(res, 404, "Application not found.");
   res.set("Cache-Control", "no-store");
   res.json(record);
 });
-app.patch("/api/admin/admissions/:reference", requireAdmin, async (req, res, next) => {
+app.patch("/api/admin/admissions/:reference", requireSchoolManager, async (req, res, next) => {
   try {
     const record = (state.admissions || []).find(x => x.reference === req.params.reference);
     if (!record) return sendError(res, 404, "Application not found.");
@@ -283,7 +444,7 @@ app.patch("/api/admin/admissions/:reference", requireAdmin, async (req, res, nex
     res.json({ ok: true, updatedAt: record.updatedAt });
   } catch (err) { next(err); }
 });
-app.get("/api/admin/admissions/:reference/download", requireAdmin, (req, res) => {
+app.get("/api/admin/admissions/:reference/download", requireSchoolManager, (req, res) => {
   const record = (state.admissions || []).find(x => x.reference === req.params.reference);
   if (!record) return sendError(res, 404, "Application not found.");
   res.set("Cache-Control", "no-store");
@@ -314,13 +475,13 @@ app.get("/api/public/media", async (_req, res, next) => {
     res.json({ items: items.map(safePublicItem), usedBytes: used, limitBytes: totalMediaLimitBytes });
   } catch (err) { next(err); }
 });
-app.get("/api/admin/media", requireAdmin, async (_req, res, next) => {
+app.get("/api/admin/media", requireSchoolManager, async (_req, res, next) => {
   try {
     const used = await directoryBytes(mediaRoot);
     res.json({ items: state.items.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(safePublicItem), usedBytes: used, limitBytes: totalMediaLimitBytes });
   } catch (err) { next(err); }
 });
-app.post("/api/admin/media", requireAdmin, upload.single("file"), async (req, res, next) => {
+app.post("/api/admin/media", requireSchoolManager, upload.single("file"), async (req, res, next) => {
   try {
     const type = String(req.body.type || "");
     const title = String(req.body.title || "").trim().slice(0, 120);
@@ -366,7 +527,7 @@ app.post("/api/admin/media", requireAdmin, upload.single("file"), async (req, re
     res.status(201).json(safePublicItem(item));
   } catch (err) { next(err); }
 });
-app.delete("/api/admin/media/:id", requireAdmin, async (req, res, next) => {
+app.delete("/api/admin/media/:id", requireSchoolManager, async (req, res, next) => {
   try {
     const item = state.items.find(x => x.id === req.params.id);
     if (!item) return sendError(res, 404, "Post not found.");
@@ -454,6 +615,7 @@ async function start() {
   catch (err) { if (err.code !== "ENOENT") throw err; await saveState(); }
   if (!Array.isArray(state.items)) state.items = [];
   if (!Array.isArray(state.admissions)) state.admissions = [];
+  if (!Array.isArray(state.users)) state.users = [];
   if (!state.schoolData || typeof state.schoolData !== "object") state.schoolData = null;
   app.listen(port, "0.0.0.0", () => console.log("N'wa Mhinga portal listening on port " + port));
 }

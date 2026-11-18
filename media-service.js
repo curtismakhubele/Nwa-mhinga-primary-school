@@ -81,12 +81,23 @@ async function loadSharedSchoolData() {
   const keys = ["learners", "assessments", "learnerAttendance", "learnerReports", "docs"];
   if (data.initialized) keys.forEach(k => { if (Array.isArray(data[k])) db[k] = data[k]; });
   else {
-    keys.forEach(k => { if (!Array.isArray(db[k])) db[k] = []; });
+    keys.forEach(k => { db[k] = Array.isArray(data[k]) ? data[k] : []; });
+    if (!['Admin','Principal'].includes(window.apiUser?.role)) return;
     const payload = Object.fromEntries(keys.map(k => [k, db[k]]));
     const saved = await fetch("/api/admin/data", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     if (!saved.ok) throw new Error("Could not initialize shared school records.");
   }
-  localStorage.setItem("nwaEduCloudV2", JSON.stringify(db));
+  if (!window.mediaApiMode) localStorage.setItem("nwaEduCloudV2", JSON.stringify(db));
+}
+async function migrateLocalUsers() {
+  const legacyUsers = (db.users || []).filter(user => user.password);
+  if (!legacyUsers.length) return { imported: 0, skipped: 0 };
+  const r = await fetch("/api/admin/users/migrate", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ users: legacyUsers }) });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || "Could not migrate existing accounts.");
+  db.users = data.users || [];
+  try { const saved = JSON.parse(localStorage.getItem("nwaEduCloudV2") || "{}"); saved.users = []; localStorage.setItem("nwaEduCloudV2", JSON.stringify(saved)); } catch {}
+  return data;
 }
 function drawAdminMedia() {
   const host = document.getElementById("media-admin-list"); if (!host) return;
@@ -165,7 +176,10 @@ window.removeMedia = async function(id) {
 };
 window.me = function() { return window.apiUser || localPortalMe(); };
 window.can = function(page) {
-  if (window.apiUser) return ["dashboard","users","learners","classes","assessments","reports","upload","backup","settings","attendance","media","admissions"].includes(page);
+  if (window.apiUser) {
+    if (["media","admissions"].includes(page)) return ["Admin","Principal"].includes(window.apiUser.role);
+    return (db.permissions?.[window.apiUser.role] || []).includes(page);
+  }
   return localPortalCan(page);
 };
 window.doLogin = async function() {
@@ -175,15 +189,21 @@ window.doLogin = async function() {
   try {
     const r = await fetch("/api/admin/login", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
     const data = await r.json();
-    if (!r.ok) return alert(data.error || "Administrator sign-in failed.");
-    window.apiUser = { id: "server-admin", name: "School Administrator", email: data.email, role: "Admin", assignedGrade: "All", assignedClass: "All", status: "Active" };
-    await loadSharedSchoolData(); await refreshPublicMedia(); render("dashboard"); toast("Signed in as school administrator.");
+    if (!r.ok) return alert(data.error || "Sign-in failed.");
+    window.apiUser = data.user;
+    let migrationError = false;
+    if (window.apiUser.role === "Admin") { try { await migrateLocalUsers(); } catch { migrationError = true; } }
+    else db.users = [];
+    await loadSharedSchoolData(); await refreshPublicMedia(); render("dashboard"); toast("Welcome, " + window.apiUser.name + ".");
+    if (migrationError) alert("You are signed in, but older accounts stored on this device were not transferred. Open User & Access while online to retry.");
   } catch { alert("The school server is not reachable. Try again shortly."); }
 };
 window.logout = async function() {
   if (mediaApiMode && window.apiUser) {
     try { await fetch("/api/admin/logout", { method: "POST", credentials: "same-origin" }); } catch {}
     window.apiUser = null;
+    for (const key of ["learners","assessments","learnerAttendance","learnerReports","docs"]) db[key] = [];
+    db.users = [];
     window.login();
     return;
   }
@@ -208,18 +228,20 @@ async function initializeMediaApp() {
     const session = await fetch("/api/admin/session", { credentials: "same-origin", cache: "no-store" });
     const status = await session.json();
     if (status.authenticated) {
-      window.apiUser = { id: "server-admin", name: "School Administrator", email: status.email, role: "Admin", assignedGrade: "All", assignedClass: "All", status: "Active" };
-      try { await loadSharedSchoolData(); render("dashboard"); }
+      window.apiUser = status.user;
+      try { if (window.apiUser.role === "Admin") await migrateLocalUsers(); else db.users = []; await loadSharedSchoolData(); render("dashboard"); }
       catch (e) { window.apiUser = null; window.login(); document.querySelector(".demo-box")?.remove(); const helper = document.querySelector(".login-card .muted"); if (helper) helper.textContent = e.message + " Contact the school system administrator."; }
     } else {
       window.apiUser = null;
+      for (const key of ["learners","assessments","learnerAttendance","learnerReports","docs"]) db[key] = [];
+      db.users = [];
       window.login();
-      document.getElementById("email")?.setAttribute("placeholder", "Administrator email");
+      document.getElementById("email")?.setAttribute("placeholder", "School account email");
       const email = document.getElementById("email"); if (email) email.value = "";
       const password = document.getElementById("password"); if (password) password.value = "";
       document.querySelector(".demo-box")?.remove();
       const helper = document.querySelector(".login-card .muted");
-      if (helper) helper.textContent = "Sign in with the administrator account configured for this app.";
+      if (helper) helper.textContent = "Sign in with your school account credentials.";
     }
     await refreshPublicMedia();
     dismissPortalLoader();

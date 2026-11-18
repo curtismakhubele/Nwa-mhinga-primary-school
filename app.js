@@ -38,7 +38,7 @@ db.permissions=emptySchool.permissions;
 for(const key of ["users","learners","assessments","learnerAttendance","learnerReports","docs","staffAttendance"])if(!Array.isArray(db[key]))db[key]=[];
 localStorage.setItem(DB_KEY,JSON.stringify(db));
 function save(){
- localStorage.setItem(DB_KEY,JSON.stringify(db));
+ if(!window.apiUser)localStorage.setItem(DB_KEY,JSON.stringify(db));
  if(window.apiUser){
   const data={learners:db.learners||[],assessments:db.assessments||[],learnerAttendance:db.learnerAttendance||[],learnerReports:db.learnerReports||[],docs:db.docs||[]};
   window.schoolDataWrite=(window.schoolDataWrite||Promise.resolve()).then(()=>fetch("/api/admin/data",{method:"PUT",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})).then(async r=>{if(!r.ok)throw new Error((await r.json()).error||"Save failed")}).catch(e=>{console.error("Shared school data save failed",e);toast("Shared save failed. Check the connection and retry.")});
@@ -56,7 +56,7 @@ function login(){
  </section><section class="login-panel"><div class="login-card">
  <img class="logo-exact login-logo" src="nwa-mhinga-p-logo.png" alt="School logo"><div class="mini-brand">N'WA MHINGA <span>P</span></div><div class="muted">School Data Management System</div>
  <h2>Welcome Back</h2><div class="muted">Sign in to access your learning platform</div>
- <div class="field"><label>Administrator email</label><input id="email" class="input" placeholder="Administrator email" autocomplete="username"></div>
+ <div class="field"><label>Email / Username</label><input id="email" class="input" placeholder="School account email" autocomplete="username"></div>
  <div class="field"><label>Password</label><input id="password" class="input" type="password" autocomplete="current-password"></div>
  <button class="btn btn-primary btn-full" onclick="doLogin()">Login</button>
  <div class="admissions-entry"><a class="btn btn-blue btn-full" href="./admissions.html">Apply for Admission</a><button class="btn btn-soft btn-full" onclick="forgot()">Forgot Password?</button><p class="muted">New learners can start an application without signing in.</p></div>
@@ -138,6 +138,7 @@ function classesForUser(){
 }
 function users(){
  if(me().role!=="Admin")return `<div class="page-title"><div><h1>User & Access Management</h1><div class="muted">Only the system administrator can assign credentials and access.</div></div></div><div class="card"><div class="empty">Administrator access required.</div></div>`;
+ if(window.mediaApiMode)setTimeout(loadServerUsers,0);
  return `<div class="page-title"><div><h1>User & Access Management</h1><div class="muted">Create, edit, and remove accounts, roles, grade/class scope, and credentials.</div></div><button class="btn btn-primary" onclick="openUser()">+ Create User</button></div>
  <div class="card"><div class="toolbar"><input id="userQ" class="input" placeholder="Search name/email..." oninput="filterUsers()"><select id="userRole" onchange="filterUsers()"><option value="">All roles</option>${["Admin","Principal","Vice Principal","Teacher","Parent","Learner"].map(x=>`<option>${x}</option>`).join("")}</select></div><div id="usersTable">${userTable(db.users)}</div></div>`;
 }
@@ -172,34 +173,48 @@ function openUser(existing=null){
  <div class="field"><label>Status</label><select id="uStatus"><option ${u.status==="Active"?"selected":""}>Active</option><option ${u.status==="Suspended"?"selected":""}>Suspended</option></select></div>
  <div class="field"><label>Assigned Grade</label><select id="uGrade">${["All","Grade R","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 4-7"].map(x=>`<option ${u.assignedGrade===x?"selected":""}>${x}</option>`).join("")}</select></div>
  <div class="field"><label>Assigned Class</label><input id="uClass" class="input" value="${esc(u.assignedClass||"All")}"></div>
- <div class="field wide"><label>Initial Password</label><div class="password-row"><input id="uPass" class="input" value="${esc(u.password||generatePassword())}"><button class="btn btn-blue" onclick="uPass.value=generatePassword()">Generate</button></div></div>
+ <div class="field"><label>${existing?"New password (optional)":"Initial password"}</label><div class="password-row"><input id="uPass" class="input" type="password" autocomplete="new-password" value="${window.mediaApiMode?"":esc(u.password||generatePassword())}"><button class="btn btn-blue" onclick="uPass.value=generatePassword()">Generate</button></div></div>
+ <div class="field" id="learnerLinkField" style="${["Parent","Learner"].includes(u.role)?"":"display:none"}"><label>Linked learner</label><select id="uLearner"><option value="">Select learner</option>${db.learners.map(l=>`<option value="${esc(l.id)}" ${u.learnerId===l.id?"selected":""}>${esc(l.name)} · ${esc(l.grade)}</option>`).join("")}</select></div>
  </div>
  <div class="card" style="margin-top:15px;background:#f8fafc"><b>Access rule</b><p class="muted">Teacher accounts are restricted to their assigned grade/class. Parent and learner accounts are restricted to their linked learner. Principal and Vice Principal access follows their assigned scope.</p></div>
  <button class="btn btn-primary btn-full" onclick="saveUser('${existing?.id||""}')">${existing?"Save Access Changes":"Create User"}</button>`);
 }
 function generatePassword(){const chars="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$";let s="";for(let i=0;i<12;i++)s+=chars[Math.floor(Math.random()*chars.length)];return s}
-function roleFields(){}
-function saveUser(id){
+function roleFields(){const field=document.getElementById("learnerLinkField");if(field)field.style.display=["Parent","Learner"].includes(uRole.value)?"block":"none"}
+async function loadServerUsers(){
+ if(!window.apiUser||window.apiUser.role!=="Admin")return;
+ try{const r=await fetch("/api/admin/users",{credentials:"same-origin",cache:"no-store"});const data=await r.json();if(!r.ok)throw new Error(data.error||"Could not load accounts.");db.users=data.users||[];const host=document.getElementById("usersTable");if(host)host.innerHTML=userTable(db.users)}catch(e){const host=document.getElementById("usersTable");if(host)host.innerHTML='<p class="err" style="display:block">'+esc(e.message)+'</p>'}
+}
+async function saveUser(id){
  let name=uName.value.trim(),email=uEmail.value.trim().toLowerCase(),pass=uPass.value;
+ if(window.mediaApiMode){
+  if(!name||!email||(!id&&pass.length<8))return toast("Enter a name, email and a password of at least 8 characters.");
+  const payload={name,email,password:pass,role:uRole.value,status:uStatus.value,assignedGrade:uGrade.value,assignedClass:uClass.value||"All",learnerId:document.getElementById("uLearner")?.value||""};
+  try{const r=await fetch("/api/admin/users"+(id?"/"+encodeURIComponent(id):""),{method:id?"PATCH":"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||"Could not save account.");closeModal();await loadServerUsers();render("users");if(pass)openModal("Account credentials",`<p><b>${esc(data.user.name)}</b></p><p class="muted">Share this password securely with the account holder.</p><div class="field"><label>Email</label><input class="input" readonly value="${esc(data.user.email)}"></div><div class="password-row"><input class="input" readonly value="${esc(pass)}"><button class="btn btn-blue" onclick="navigator.clipboard?.writeText(this.previousElementSibling.value);toast('Password copied')">Copy password</button></div><button class="btn btn-primary btn-full" onclick="closeModal()">Done</button>`);else toast("User access updated.")}catch(e){toast(e.message)}
+  return;
+ }
  if(!name||!email||!pass)return toast("Complete all required fields");
  if(id){let u=db.users.find(x=>x.id===id);Object.assign(u,{name,email,password:pass,role:uRole.value,status:uStatus.value,assignedGrade:uGrade.value,assignedClass:uClass.value||"All"});toast("User access updated")}
  else{if(db.users.some(x=>x.email.toLowerCase()===email))return toast("Email already exists");let u={id:"U"+Date.now().toString().slice(-6),name,email,password:pass,role:uRole.value,status:uStatus.value,assignedGrade:uGrade.value,assignedClass:uClass.value||"All"};db.users.push(u);toast("User created. Credentials generated.");}
  save();closeModal();render("users");
 }
 function editUser(id){openUser(db.users.find(u=>u.id===id))}
-function removeUser(id){
+async function removeUser(id){
  if(me().role!=="Admin")return toast("Administrator access required");
  const user=db.users.find(x=>x.id===id);if(!user)return toast("User account not found");
  if(id===me().id)return toast("You cannot remove the account you are using");
  if(user.role==="Admin"&&user.status==="Active"&&db.users.filter(x=>x.role==="Admin"&&x.status==="Active").length<=1)return toast("At least one active administrator account must remain");
  if(!confirm(`Remove access for ${user.name} (${user.email})? Learner records will be kept.`))return;
+ if(window.mediaApiMode){try{const r=await fetch("/api/admin/users/"+encodeURIComponent(id),{method:"DELETE",credentials:"same-origin"});const data=await r.json();if(!r.ok)throw new Error(data.error||"Could not remove account.");await loadServerUsers();render("users");toast("User account removed.")}catch(e){toast(e.message)}return}
  db.users=db.users.filter(x=>x.id!==id);save();render("users");toast("User access removed; learner records were kept");
 }
-function resetUserPassword(id){let u=db.users.find(x=>x.id===id);let p=generatePassword();u.password=p;save();openModal("New Temporary Password",`<p><b>${esc(u.name)}</b></p><p class="muted">Give this temporary password securely to the user. The user should change it after signing in.</p><div class="password-row"><input class="input" readonly value="${p}" id="tempPass"><button class="btn btn-blue" onclick="navigator.clipboard?.writeText(tempPass.value);toast('Password copied')">Copy</button></div><button class="btn btn-primary btn-full" onclick="closeModal()">Done</button>`)}
+function resetUserPassword(id){let u=db.users.find(x=>x.id===id),p=generatePassword();if(window.mediaApiMode){openModal("Set Temporary Password",`<p><b>${esc(u.name)}</b></p><p>Set a new password for this account.</p><input class="input" id="tempPass" type="password" value="${p}"><button class="btn btn-primary btn-full" onclick="saveTemporaryPassword('${esc(id)}')">Save password</button>`);return}u.password=p;save();openModal("New Temporary Password",`<p><b>${esc(u.name)}</b></p><p class="muted">Give this temporary password securely to the user. The user should change it after signing in.</p><div class="password-row"><input class="input" readonly value="${p}" id="tempPass"><button class="btn btn-blue" onclick="navigator.clipboard?.writeText(tempPass.value);toast('Password copied')">Copy</button></div><button class="btn btn-primary btn-full" onclick="closeModal()">Done</button>`)}
+async function saveTemporaryPassword(id){const u=db.users.find(x=>x.id===id),password=document.getElementById("tempPass").value;if(password.length<8)return toast("Password must be at least 8 characters.");try{const r=await fetch("/api/admin/users/"+encodeURIComponent(id),{method:"PATCH",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({...u,password})});const data=await r.json();if(!r.ok)throw new Error(data.error||"Could not update password.");closeModal();openModal("Temporary Password",`<p><b>${esc(u.name)}</b></p><p class="muted">Share this password securely. The user can now sign in.</p><div class="password-row"><input class="input" readonly value="${esc(password)}"><button class="btn btn-blue" onclick="navigator.clipboard?.writeText(this.previousElementSibling.value);toast('Password copied')">Copy</button></div><button class="btn btn-primary btn-full" onclick="closeModal()">Done</button>`)}catch(e){toast(e.message)}}
 function changePassword(){
  openModal("Change My Password",`<p class="muted">For security, enter your current password and create a new password.</p><div class="field"><label>Current password</label><input id="oldPass" class="input" type="password"></div><div class="field"><label>New password</label><input id="newPass" class="input" type="password"></div><div class="field"><label>Confirm new password</label><input id="confirmPass" class="input" type="password"></div><button class="btn btn-primary btn-full" onclick="savePassword()">Change Password</button>`);
 }
-function savePassword(){
+async function savePassword(){
+ if(window.mediaApiMode){if(newPass.value.length<8)return toast("New password must be at least 8 characters");if(newPass.value!==confirmPass.value)return toast("Passwords do not match");try{const r=await fetch("/api/account/password",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({currentPassword:oldPass.value,newPassword:newPass.value})});const data=await r.json();if(!r.ok)throw new Error(data.error||"Could not change password.");window.apiUser=null;closeModal();login();alert("Password changed. Sign in again with your new password.")}catch(e){toast(e.message)}return}
  if(oldPass.value!==me().password)return toast("Current password is incorrect");
  if(newPass.value.length<8)return toast("New password must be at least 8 characters");
  if(newPass.value!==confirmPass.value)return toast("Passwords do not match");
