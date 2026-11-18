@@ -26,7 +26,7 @@ window.login=function(){
   if(!panel)return;
   const directions=document.createElement("a");
   directions.className="school-directions";
-  directions.href="https://www.google.com/maps/dir/?api=1&destination=-25.77897%2C28.05932";
+  directions.href="https://www.google.com/maps/dir/?api=1&destination=N%27wa-Mhinga+Primary+School%2C+Ntsu+St+%26+Ramosa+St%2C+Saulsville%2C+Pretoria%2C+0125";
   directions.target="_blank";directions.rel="noopener noreferrer";
   directions.textContent="Get directions to N'wa Mhinga Primary School (Ntsu St & Ramosa St, Saulsville)";
   panel.append(directions);
