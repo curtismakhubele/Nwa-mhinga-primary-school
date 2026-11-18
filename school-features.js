@@ -26,7 +26,7 @@ window.login=function(){
   if(!panel)return;
   const directions=document.createElement("a");
   directions.className="school-directions";
-  directions.href="https://www.google.com/maps/dir/?api=1&destination=02+Ntsu+Street%2C+Saulsville%2C+Pretoria%2C+0125";
+  directions.href="https://www.google.com/maps/dir/?api=1&destination=N%27wa-Mhinga+Primary+School%2C+Ntsu+St%2C+Saulsville%2C+Pretoria&destination_place_id=ChIJ35CZTZl9lR4RuyGCF-K0V4M";
   directions.target="_blank";directions.rel="noopener noreferrer";
   directions.textContent="Get directions to N'wa Mhinga Primary School";
   panel.append(directions);
@@ -161,5 +161,6 @@ window.downloadLearnerReport=function(id){
 };
 window.backup=function(){return '<div class="page-title"><div><h1>Storage & Backups</h1><div class="muted">Current hosting: Azure App Service F1 app storage.</div></div></div><div class="card"><h3>Shared records are connected</h3><p>Learner records, marks, attendance, generated reports, admissions and media metadata are stored on this app. Uploaded media files use the configured 600 MiB F1 quota.</p><p class="badge gold">No separate backup or 250 TB storage is configured</p><p>Download important records regularly. F1 app storage is a prototype store, not a database or a 250 TB cloud archive. The 250 TB target requires a separately funded Azure Storage plan.</p></div>'};
 window.runBackup=function(){toast("Azure cloud storage is not connected yet; no backup was made.")};
+
 
 
