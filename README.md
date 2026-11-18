@@ -26,31 +26,6 @@ This version advances the supplied visual reference into a working responsive pr
 - Reports
 - Responsive mobile layout
 
-## Demo credentials
-Admin:
-admin@nwamhingap.co.za
-Admin@123
-
-Principal:
-principal@nwamhingap.co.za
-Principal@123
-
-Vice Principal:
-vp@nwamhingap.co.za
-Vice@123
-
-Teacher:
-teacher3@nwamhingap.co.za
-Teacher@123
-
-Parent:
-parent@nwamhingap.co.za
-Parent@123
-
-Learner:
-learner@nwamhingap.co.za
-Learner@123
-
 ## Run in Visual Studio Code
 1. Extract the ZIP.
 2. Open the project folder in VS Code.
@@ -58,7 +33,7 @@ Learner@123
 4. Open index.html with Live Server.
 
 ## Important production note
-This is a front-end prototype. Credentials and data are stored in browser localStorage so the role and access flows can be demonstrated without a server. Do not use real learner information in this version.
+The app starts with no demo accounts, learners, assessments, attendance, reports, or sample documents. On the hosted Azure app, administrator sign-in uses credentials configured in App Service settings. Local Live Server has no preconfigured accounts. When the app loads, it removes the former bundled sample records from browser storage and preserves other records.
 
 For deployment, replace localStorage authentication with a secure server/database:
 - PostgreSQL

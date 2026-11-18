@@ -1,37 +1,13 @@
 const DB_KEY="nwaEduCloudV2";
-const demo={
+const emptySchool={
  school:{name:"N'WA MHINGA P",motto:"Education for a Better Tomorrow"},
  currentUser:null,
- users:[
-  {id:"U001",name:"System Administrator",email:"admin@nwamhingap.co.za",role:"Admin",password:"Admin@123",assignedGrade:"All",assignedClass:"All",status:"Active"},
-  {id:"U002",name:"Ms Principal",email:"principal@nwamhingap.co.za",role:"Principal",password:"Principal@123",assignedGrade:"All",assignedClass:"All",status:"Active"},
-  {id:"U003",name:"Mr Vice Principal",email:"vp@nwamhingap.co.za",role:"Vice Principal",password:"Vice@123",assignedGrade:"Grade 4-7",assignedClass:"All",status:"Active"},
-  {id:"U004",name:"Mr Dlamini",email:"teacher3@nwamhingap.co.za",role:"Teacher",password:"Teacher@123",assignedGrade:"Grade 3",assignedClass:"3A",status:"Active"},
-  {id:"U005",name:"Ms Mokoena",email:"teacher6@nwamhingap.co.za",role:"Teacher",password:"Teacher@456",assignedGrade:"Grade 6",assignedClass:"6A",status:"Active"},
-  {id:"U006",name:"Parent Demo",email:"parent@nwamhingap.co.za",role:"Parent",password:"Parent@123",assignedGrade:"Grade 3",assignedClass:"3A",status:"Active",learnerId:"L001"},
-  {id:"U007",name:"Learner Demo",email:"learner@nwamhingap.co.za",role:"Learner",password:"Learner@123",assignedGrade:"Grade 3",assignedClass:"3A",status:"Active",learnerId:"L001"}
- ],
- learners:[
-  {id:"L001",name:"Thabo Mokoena",grade:"Grade 3",class:"3A",gender:"M",attendance:96,parent:"Parent Demo",subjects:"Mathematics, English, Life Skills"},
-  {id:"L002",name:"Nomsa Dlamini",grade:"Grade 3",class:"3A",gender:"F",attendance:94,parent:"Mrs Dlamini",subjects:"Mathematics, English, isiZulu"},
-  {id:"L003",name:"Sipho Nkosi",grade:"Grade 3",class:"3A",gender:"M",attendance:91,parent:"Mr Nkosi",subjects:"English, Science"},
-  {id:"L004",name:"Lerato Masuku",grade:"Grade 3",class:"3A",gender:"F",attendance:98,parent:"Mrs Masuku",subjects:"English, Social Science"},
-  {id:"L005",name:"Kabelo Ndlovu",grade:"Grade 3",class:"3A",gender:"M",attendance:89,parent:"Mr Ndlovu",subjects:"Mathematics, Life Skills"},
-  {id:"L006",name:"Amahle Dlamini",grade:"Grade 1",class:"1A",gender:"F",attendance:97,parent:"Parent Demo",subjects:"Literacy, Numeracy"},
-  {id:"L007",name:"Siyabonga Zulu",grade:"Grade 2",class:"2A",gender:"M",attendance:90,parent:"Mr Zulu",subjects:"Mathematics, English"},
-  {id:"L008",name:"Lerato Nkosi",grade:"Grade 7",class:"7A",gender:"F",attendance:98,parent:"Mrs Nkosi",subjects:"English, Mathematics"},
-  {id:"L009",name:"Peter Maseko",grade:"Grade 6",class:"6A",gender:"M",attendance:93,parent:"Mr Maseko",subjects:"Mathematics, Science"}
- ],
- assessments:[
-  {id:"A001",learnerId:"L001",subject:"Mathematics",term:"Term 2",mark:78},
-  {id:"A002",learnerId:"L001",subject:"English",term:"Term 2",mark:82},
-  {id:"A003",learnerId:"L002",subject:"Mathematics",term:"Term 2",mark:74},
-  {id:"A004",learnerId:"L008",subject:"English",term:"Term 2",mark:89}
- ],
- docs:[
-  {id:"D001",name:"Grade 3 Term 2 Results.xlsx",category:"Academic",owner:"Mr Dlamini",date:"2026-10-05",size:"248 KB"},
-  {id:"D002",name:"School Policy.pdf",category:"School",owner:"Admin",date:"2026-10-06",size:"1.2 MB"}
- ],
+ users:[],
+ learners:[],
+ assessments:[],
+ learnerAttendance:[],
+ learnerReports:[],
+ docs:[],
  permissions:{
   Admin:["dashboard","users","learners","classes","assessments","reports","upload","backup","settings","attendance"],
   Principal:["dashboard","users","learners","classes","assessments","reports","upload","backup","settings","attendance"],
@@ -40,9 +16,27 @@ const demo={
   Parent:["dashboard","learners","assessments","reports"],
   Learner:["dashboard","assessments","reports"]
  },
- backup:{last:"Today, 14:32",status:"Completed",used:"2.4 GB / 10 GB",percent:82}
+ backup:{last:"Never",status:"No backup yet",used:"0 MB",percent:0}
 };
-let db=JSON.parse(localStorage.getItem(DB_KEY)||"null")||demo;
+const demoUserIds=new Set(["U001","U002","U003","U004","U005","U006","U007"]);
+const demoUserEmails=new Set(["admin@nwamhingap.co.za","principal@nwamhingap.co.za","vp@nwamhingap.co.za","teacher3@nwamhingap.co.za","teacher6@nwamhingap.co.za","parent@nwamhingap.co.za","learner@nwamhingap.co.za"]);
+const demoLearnerIds=new Set(["L001","L002","L003","L004","L005","L006","L007","L008","L009"]);
+function cleanDemoRecords(data){
+ data.users=(data.users||[]).filter(u=>!demoUserIds.has(u.id)&&!demoUserEmails.has(String(u.email||"").toLowerCase()));
+ data.learners=(data.learners||[]).filter(l=>!demoLearnerIds.has(l.id));
+ data.assessments=(data.assessments||[]).filter(a=>!["A001","A002","A003","A004"].includes(a.id)&&!demoLearnerIds.has(a.learnerId));
+ data.learnerAttendance=(data.learnerAttendance||[]).filter(a=>!demoLearnerIds.has(a.learnerId));
+ data.learnerReports=(data.learnerReports||[]).filter(a=>!demoLearnerIds.has(a.learnerId));
+ data.docs=(data.docs||[]).filter(d=>!["D001","D002"].includes(d.id));
+ data.staffAttendance=(data.staffAttendance||[]).filter(a=>!demoUserIds.has(a.employeeId));
+ if(demoUserIds.has(data.currentUser))data.currentUser=null;
+ return data;
+}
+let db=cleanDemoRecords({...emptySchool,...JSON.parse(localStorage.getItem(DB_KEY)||"{}")});
+db.school={...emptySchool.school,...db.school};
+db.permissions=emptySchool.permissions;
+for(const key of ["users","learners","assessments","learnerAttendance","learnerReports","docs","staffAttendance"])if(!Array.isArray(db[key]))db[key]=[];
+localStorage.setItem(DB_KEY,JSON.stringify(db));
 function save(){
  localStorage.setItem(DB_KEY,JSON.stringify(db));
  if(window.apiUser){
@@ -62,11 +56,10 @@ function login(){
  </section><section class="login-panel"><div class="login-card">
  <img class="logo-exact login-logo" src="nwa-mhinga-p-logo.png" alt="School logo"><div class="mini-brand">N'WA MHINGA <span>P</span></div><div class="muted">School Data Management System</div>
  <h2>Welcome Back</h2><div class="muted">Sign in to access your learning platform</div>
- <div class="field"><label>Username / Email</label><input id="email" class="input" value="admin@nwamhingap.co.za"></div>
- <div class="field"><label>Password</label><input id="password" class="input" type="password" value="Admin@123"></div>
+ <div class="field"><label>Administrator email</label><input id="email" class="input" placeholder="Administrator email" autocomplete="username"></div>
+ <div class="field"><label>Password</label><input id="password" class="input" type="password" autocomplete="current-password"></div>
  <button class="btn btn-primary btn-full" onclick="doLogin()">Login</button>
  <div class="admissions-entry"><a class="btn btn-blue btn-full" href="./admissions.html">Apply for Admission</a><button class="btn btn-soft btn-full" onclick="forgot()">Forgot Password?</button><p class="muted">New learners can start an application without signing in.</p></div>
- <div class="demo-box"><b>Demo accounts</b><br>Admin: admin@nwamhingap.co.za / Admin@123<br>Principal: principal@nwamhingap.co.za / Principal@123<br>Teacher: teacher3@nwamhingap.co.za / Teacher@123<br>Parent: parent@nwamhingap.co.za / Parent@123<br>Learner: learner@nwamhingap.co.za / Learner@123</div>
  </div></section></div>`;
 }
 function doLogin(){
@@ -77,8 +70,8 @@ function doLogin(){
 }
 function forgot(){alert("Password reset: ask the school administrator to issue a temporary password. Production version should connect this flow to secure email/SMS reset.")}
 function logout(){db.currentUser=null;save();login()}
-function me(){return db.users.find(u=>u.id===db.currentUser)||db.users[0]}
-function can(page){return (db.permissions[me().role]||[]).includes(page)}
+function me(){return window.apiUser||db.users.find(u=>u.id===db.currentUser)||null}
+function can(page){const u=me();return !!u&&(db.permissions[u.role]||[]).includes(page)}
 function assignedLearners(){
  const u=me();
  if(["Admin","Principal"].includes(u.role))return db.learners;

@@ -134,8 +134,34 @@ app.post("/api/admin/logout", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+// Remove only the known bundled sample rows from existing app storage.
+function cleanLegacyDemoSchoolData(data) {
+  const learners = new Set(["L001", "L002", "L003", "L004", "L005", "L006", "L007", "L008", "L009"]);
+  const assessments = new Set(["A001", "A002", "A003", "A004"]);
+  const docs = new Set(["D001", "D002"]);
+  const clean = { ...data };
+  for (const key of ["learners", "assessments", "learnerAttendance", "learnerReports", "docs"]) {
+    clean[key] = Array.isArray(data[key]) ? data[key] : [];
+  }
+  clean.learners = clean.learners.filter(row => !learners.has(row.id));
+  clean.assessments = clean.assessments.filter(row => !assessments.has(row.id) && !learners.has(row.learnerId));
+  clean.learnerAttendance = clean.learnerAttendance.filter(row => !learners.has(row.learnerId));
+  clean.learnerReports = clean.learnerReports.filter(row => !learners.has(row.learnerId));
+  clean.docs = clean.docs.filter(row => !docs.has(row.id));
+  return clean;
+}
 // Shared school records for the F1 prototype. This is persistent app storage, not a database.
-app.get("/api/admin/data", requireAdmin, (_req, res) => res.json(state.schoolData ? { ...state.schoolData, initialized: true } : { initialized: false }));
+app.get("/api/admin/data", requireAdmin, async (_req, res, next) => {
+  try {
+    if (!state.schoolData) return res.json({ initialized: false });
+    const clean = cleanLegacyDemoSchoolData(state.schoolData);
+    if (JSON.stringify(clean) !== JSON.stringify(state.schoolData)) {
+      state.schoolData = clean;
+      await saveState();
+    }
+    res.json({ ...clean, initialized: true });
+  } catch (err) { next(err); }
+});
 app.put("/api/admin/data", requireAdmin, async (req, res, next) => {
   try {
     const input = req.body && typeof req.body === "object" ? req.body : {};
