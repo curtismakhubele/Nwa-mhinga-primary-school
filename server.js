@@ -258,6 +258,7 @@ app.post("/api/public/parent/register", async (req, res, next) => {
     const idPassport = normalizeParentIdentifier(req.body?.idPassport);
     const password = String(req.body?.password || "");
     if (!name || name.length > 120 || idPassport.length < 4 || idPassport.length > 32 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 256) return sendError(res, 400, "Enter your name, ID/passport, a valid email, and a password of at least 8 characters.");
+    if (/^\d{13}$/.test(idPassport) && !isValidSouthAfricanId(idPassport)) return sendError(res, 400, "Enter a valid 13-digit South African ID number, or enter your passport number.");
     const idHash = parentIdentifierHash(idPassport);
     if ((state.users || []).some(user => user.email === email || user.idPassportHash === idHash) || [appSetting("SCHOOL_ADMIN_EMAIL"), appSetting("SCHOOL_ADMIN_TEST_EMAIL")].some(value => value.trim().toLowerCase() === email)) return sendError(res, 409, "An account with this email or ID/passport already exists. Sign in instead.");
     const { salt, hash } = hashPassword(password);
@@ -553,6 +554,17 @@ function parentApplicationView(record) {
 function normalizeParentIdentifier(value) {
   return String(value || "").trim().replace(/[\s-]+/g, "").toUpperCase();
 }
+function isValidSouthAfricanId(value) {
+  const id = String(value || "");
+  if (!/^\d{13}$/.test(id)) return false;
+  const month = Number(id.slice(2, 4)), day = Number(id.slice(4, 6));
+  if (month < 1 || month > 12 || day < 1 || day > 31 || !["0", "1"].includes(id[10])) return false;
+  const digits = id.split("").map(Number);
+  const oddSum = digits.slice(0, 12).filter((_, i) => i % 2 === 0).reduce((sum, digit) => sum + digit, 0);
+  const evenDigits = digits.slice(0, 12).filter((_, i) => i % 2 === 1).join("");
+  const doubledEvenSum = String(Number(evenDigits) * 2).split("").reduce((sum, digit) => sum + Number(digit), 0);
+  return (10 - ((oddSum + doubledEvenSum) % 10)) % 10 === digits[12];
+}
 function parentIdentifierHash(value) {
   return crypto.createHash("sha256").update(normalizeParentIdentifier(value)).digest("hex");
 }
@@ -578,6 +590,9 @@ app.patch("/api/public/parent/applications/:reference", requireParent, async (re
     if (record.status !== "Rejected") return sendError(res, 409, "Only rejected applications can be corrected and resubmitted.");
     const { learner, application, documents } = req.body || {};
     if (!learner || typeof learner !== "object" || Array.isArray(learner) || !learner.fullName || !application || typeof application !== "object" || Array.isArray(application)) return sendError(res, 400, "The corrected application is incomplete.");
+    const parentId = normalizeParentIdentifier(application["Parent ID / passport"]), learnerId = normalizeParentIdentifier(application["Learner ID / passport no."]);
+    if (/^\d{13}$/.test(parentId) && !isValidSouthAfricanId(parentId)) return sendError(res, 400, "The parent/guardian South African ID number is not valid. Check the 13 digits or use a passport number.");
+    if (/^\d{13}$/.test(learnerId) && !isValidSouthAfricanId(learnerId)) return sendError(res, 400, "The learner South African ID number is not valid. Check the 13 digits or use a passport number.");
     if (req.parentAccount?.idPassportHash && parentIdentifierHash(application["Parent ID / passport"]) !== req.parentAccount.idPassportHash) return sendError(res, 403, "Use the ID/passport linked to your parent account.");
     if (documents && (typeof documents !== "object" || Array.isArray(documents))) return sendError(res, 400, "Submitted documents are invalid.");
     if (JSON.stringify({ learner, application, documents }).length > 8 * 1024 * 1024) return sendError(res, 413, "Corrected application is too large.");
@@ -599,6 +614,9 @@ app.post("/api/public/admissions", requireParent, async (req, res, next) => {
   try {
     const record = req.body;
     if (!record || !/^NMP-\d{4}-\d{5}$/.test(String(record.reference || "")) || !record.learner?.fullName || !record.application || typeof record.application !== "object") return sendError(res, 400, "The application is incomplete.");
+    const parentId = normalizeParentIdentifier(record.application["Parent ID / passport"]), learnerId = normalizeParentIdentifier(record.application["Learner ID / passport no."]);
+    if (/^\d{13}$/.test(parentId) && !isValidSouthAfricanId(parentId)) return sendError(res, 400, "The parent/guardian South African ID number is not valid. Check the 13 digits or use a passport number.");
+    if (/^\d{13}$/.test(learnerId) && !isValidSouthAfricanId(learnerId)) return sendError(res, 400, "The learner South African ID number is not valid. Check the 13 digits or use a passport number.");
     if (req.parentAccount?.idPassportHash && parentIdentifierHash(record.application["Parent ID / passport"]) !== req.parentAccount.idPassportHash) return sendError(res, 403, "Enter the ID/passport used to create your parent account.");
     const serialized = JSON.stringify(record);
     if (serialized.length > 8 * 1024 * 1024) return sendError(res, 413, "Application is too large. Save fewer/smaller documents and retry.");
