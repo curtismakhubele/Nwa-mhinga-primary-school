@@ -60,6 +60,7 @@ function login(){
  <div class="field"><label>Password</label><input id="password" class="input" type="password" autocomplete="current-password"></div>
  <button class="btn btn-primary btn-full" onclick="doLogin()">Login</button>
  <div class="admissions-entry"><a class="btn btn-blue btn-full" href="./admissions.html">Apply for Admission</a><button class="btn btn-soft btn-full" onclick="forgot()">Forgot Password?</button><p class="muted">New learners can start an application without signing in.</p></div>
+ <p class="copyright-notice">&#169; 2026 N'wa Mhinga Primary School. All rights reserved.</p>
  </div></section></div>`;
 }
 function doLogin(){
@@ -96,7 +97,7 @@ function render(page="dashboard"){
  <div class="nav-section">Account</div><div class="nav"><button onclick="changePassword()">🔒 Change Password</button><button onclick="logout()">↪ Logout</button></div>
  </aside><main class="main"><header class="topbar"><div class="top-left"><button class="hamb" onclick="document.getElementById('side').classList.toggle('open')">☰</button><div><b>${title(page)}</b><div class="crumb">${esc(db.school.name)} / ${esc(u.role)}</div></div></div>
  <div class="user-area"><div class="avatar">${initials(u.name)}</div><div class="user-text"><b>${esc(u.name)}</b><div class="muted">${esc(u.role)} · ${esc(u.assignedGrade||"All")}</div></div><button class="btn btn-soft" onclick="changePassword()">Password</button></div></header>
- <section class="content">${pageHTML(page)}</section></main></div><div class="mobile-bottom"><button onclick="render('dashboard')">⌂<br>Home</button><button onclick="render('learners')">♟<br>Learners</button><button onclick="render('assessments')">▣<br>Marks</button><button onclick="changePassword()">🔒<br>Password</button></div><div id="modal" class="modal"></div><div class="toast"></div>`;
+ <section class="content">${pageHTML(page)}</section><footer class="copyright-notice">&#169; 2026 N'wa Mhinga Primary School. All rights reserved.</footer></main></div><div class="mobile-bottom"><button onclick="render('dashboard')">⌂<br>Home</button><button onclick="render('learners')">♟<br>Learners</button><button onclick="render('assessments')">▣<br>Marks</button><button onclick="changePassword()">🔒<br>Password</button></div><div id="modal" class="modal"></div><div class="toast"></div>`;
 }
 function stat(icon,label,num,sub){return `<div class="card stat"><div><div class="muted">${label}</div><div class="num">${num}</div><div class="muted">${sub}</div></div><div class="stat-icon">${icon}</div></div>`}
 function pageHTML(p){

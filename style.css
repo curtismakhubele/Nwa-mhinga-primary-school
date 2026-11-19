@@ -86,3 +86,5 @@ linear-gradient(90deg,rgba(4,20,31,.96),rgba(4,20,31,.58)),url("school-bg.svg") 
 .dashboard-news .media-document{grid-column:1/-1;grid-row:auto;height:180px}
 
 
+.copyright-notice{margin:10px 0 0;text-align:center;color:#718096;font-size:11px;padding:12px}.main>.copyright-notice{border-top:1px solid var(--line);margin:0;padding:12px 25px 18px;text-align:left}@media(max-width:720px){.main>.copyright-notice{padding-bottom:80px}}
+
