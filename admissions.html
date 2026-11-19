@@ -36,7 +36,7 @@
   .c3{grid-column:span 3}.c4{grid-column:span 4}.c6{grid-column:span 6}.c8{grid-column:span 8}.c12{grid-column:span 12}
   @media(max-width:640px){.c3,.c4,.c6,.c8{grid-column:span 12}.steps li{font-size:.8rem}.brand-row{align-items:flex-start;gap:12px}.school-logo{width:64px;height:70px}header.head{padding:14px}.brand-row h1{font-size:1.2rem}}
   label,.lbl{display:block;font-size:.88rem;font-weight:600;color:var(--muted);margin-bottom:3px}
-  input[type=text],input[type=email],input[type=tel],input[type=date],input[type=number],select,textarea{
+  input[type=text],input[type=email],input[type=password],input[type=tel],input[type=date],input[type=number],select,textarea{
     width:100%;padding:9px 10px;font:inherit;color:var(--ink);background:var(--paper);
     border:1.5px solid var(--line);border-radius:3px}
   textarea{min-height:70px;resize:vertical}
@@ -74,12 +74,12 @@
   dl.kv dt{color:var(--muted);font-size:.9rem}
   dl.kv dd{margin:0;word-break:break-word}
   .profile h3{margin:16px 0 4px;font-size:1rem;border-bottom:1px solid var(--line)}
-  .saved{margin-top:24px}
-  .saved summary{cursor:pointer;font-weight:600}
-  .saved li{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
-  .saved button{padding:4px 12px;font-size:.88rem}
+  .parent-card{background:var(--surface);border:1.5px solid var(--line);padding:16px;margin:16px 0}
+  .parent-card h2{margin-top:0}
+  .parent-item{padding:12px 0;border-bottom:1px solid var(--line)}
+  .parent-item:last-child{border:0}
   @media print{
-    body{background:#fff;color:#000}.actions,.steps,.saved,.note,header.head p,.noprint{display:none}
+    body{background:#fff;color:#000}.actions,.steps,.note,header.head p,.noprint{display:none}
     .profile{border-color:#000}
   }
 </style>
@@ -103,16 +103,32 @@
   </div>
 </header>
 <nav style="margin:-2px 0 14px"><a href="./index.html" style="color:var(--accent);font-weight:700">← Back to school portal</a></nav>
-<p class="note"><strong>Application portal:</strong> Submit the completed form to send it to the school. A receipt reference appears after the server receives it. This is still a prototype; do not enter real identity, medical, or financial information.</p>
+<p class="note"><strong>Application portal:</strong> Create or sign in to a parent account before applying. Applications and learner details are visible only to the parent account and authorized school staff.</p>
 
-<ol class="steps" id="steps">
+<section class="parent-card" id="parentAuth">
+  <div id="parentAuthMessage" class="err" role="alert"></div>
+  <form id="parentLoginForm">
+    <h2>Parent / guardian sign in</h2>
+    <div class="grid"><div class="c6"><label for="parentLoginEmail">Email address</label><input id="parentLoginEmail" type="email" autocomplete="username" required></div><div class="c6"><label for="parentLoginPassword">Password</label><input id="parentLoginPassword" type="password" autocomplete="current-password" required></div></div>
+    <div class="actions"><button class="primary">Sign in</button><button class="secondary" type="button" id="showRegister">Create parent account</button></div>
+  </form>
+  <form id="parentRegisterForm" class="hidden">
+    <h2>Create parent / guardian account</h2>
+    <p class="hint">Create your account first. You will use it to submit and track your child’s application.</p>
+    <div class="grid"><div class="c12"><label for="parentName">Parent / guardian full name</label><input id="parentName" type="text" autocomplete="name" required maxlength="120"></div><div class="c6"><label for="parentRegisterEmail">Email address</label><input id="parentRegisterEmail" type="email" autocomplete="email" required></div><div class="c6"><label for="parentRegisterPassword">Password (at least 8 characters)</label><input id="parentRegisterPassword" type="password" autocomplete="new-password" minlength="8" required></div><div class="c6"><label for="parentConfirmPassword">Confirm password</label><input id="parentConfirmPassword" type="password" autocomplete="new-password" minlength="8" required></div></div>
+    <div class="actions"><button class="primary">Create account</button><button class="secondary" type="button" id="showLogin">Back to sign in</button></div>
+  </form>
+</section>
+<section class="parent-card hidden" id="parentDashboard"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h2 style="margin-bottom:0">Parent application workspace</h2><span id="parentWelcome" class="hint"></span></div><button id="parentLogout" class="secondary" type="button">Sign out</button></div><div id="parentApplications"></div></section>
+
+<ol class="steps hidden" id="steps">
   <li class="on">1. Application form</li>
   <li>2. Upload documents</li>
   <li>3. Learner profile</li>
 </ol>
 
 <!-- STEP 1 -->
-<section id="step1">
+<section id="step1" class="hidden">
 <form id="f" novalidate>
 
 <div class="gradebar">
@@ -319,7 +335,7 @@
 
 <!-- STEP 2 -->
 <section id="step2" class="hidden">
-  <p class="note">Upload each required document as a PDF or a clear photo (JPG or PNG, up to 5 MB each). Every item must have at least one file before you can submit.</p>
+  <p class="note" id="documentInstructions">Upload each required document as a PDF or a clear photo (JPG or PNG, up to 5 MB each). Every item must have at least one file before you can submit.</p>
   <div id="docList"></div>
   <p class="err" id="err2" role="alert"></p>
   <div class="actions">
@@ -339,29 +355,11 @@
   </div>
 </section>
 
-<details class="saved noprint" id="savedBox">
-  <summary id="savedSum">Saved learner profiles</summary>
-  <ul id="savedList" style="list-style:none;padding:0;margin:8px 0 0"></ul>
-  <p class="hint">Profiles are stored in this browser on this device. Download a profile to keep a copy elsewhere.</p>
-</details>
-
 </div>
 
 <script>
-/* ---------- storage (browser storage if available, memory otherwise) ---------- */
-const KEY = 'nwamhinga:learners';
-let memStore = [];
-function loadAll(){
-  try{ const raw = window.localStorage.getItem(KEY); return raw ? JSON.parse(raw) : memStore; }
-  catch(e){ return memStore; }
-}
-function saveAll(list){
-  memStore = list;
-  try{ window.localStorage.setItem(KEY, JSON.stringify(list)); return true; }
-  catch(e){ return false; }
-}
-
 /* ---------- helpers ---------- */
+try{window.localStorage.removeItem('nwamhinga:learners')}catch{}
 const $ = id => document.getElementById(id);
 const form = $('f');
 const DOCS = [
@@ -374,6 +372,40 @@ const DOCS = [
 const MAX = 5 * 1024 * 1024;
 const files = {}; DOCS.forEach(d => files[d.key] = []);
 let record = null;
+let parentAccount = null;
+let parentApplications = [];
+let correctionRecord = null;
+
+function authMessage(message){const box=$('parentAuthMessage');box.textContent=message;box.style.display=message?'block':'none'}
+function showParentAccount(user){
+  parentAccount=user;
+  $('parentAuth').classList.add('hidden');$('parentDashboard').classList.remove('hidden');$('steps').classList.remove('hidden');$('step1').classList.remove('hidden');
+  $('parentWelcome').textContent='Signed in as '+user.name+' · '+user.email;
+  refreshParentApplications();
+}
+async function refreshParentApplications(){
+  if(!parentAccount)return;
+  const host=$('parentApplications');host.textContent='Loading your applications…';
+  try{const r=await fetch('/api/public/parent/applications',{credentials:'same-origin',cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load your applications.');parentApplications=d.items||[];host.replaceChildren();
+    if(!parentApplications.length){const p=document.createElement('p');p.className='hint';p.textContent='You have not submitted an application yet.';host.append(p);return}
+    parentApplications.forEach(item=>{const row=document.createElement('div');row.className='parent-item';const title=document.createElement('b');title.textContent=(item.learner?.fullName||'Learner')+' · '+item.reference;const status=document.createElement('p');status.textContent='Status: '+item.status+(item.applicationNumber?' · School number: '+item.applicationNumber:'');row.append(title,status);
+      if(item.parentMessage){const msg=document.createElement('p');msg.className='note';msg.textContent='School message: '+item.parentMessage;row.append(msg)}
+      const view=document.createElement('button');view.type='button';view.className='secondary';view.textContent='View';view.addEventListener('click',()=>openParentApplication(item.reference,false));row.append(view);
+      if(item.status==='Rejected'){const edit=document.createElement('button');edit.type='button';edit.className='primary';edit.style.marginLeft='8px';edit.textContent='Edit and resubmit';edit.addEventListener('click',()=>openParentApplication(item.reference,true));row.append(edit)}
+      host.append(row);
+    });
+  }catch(e){host.textContent=e.message}
+}
+async function parentAuthRequest(path,payload){
+  authMessage('');
+  try{const r=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not sign in.');showParentAccount(d.user)}catch(e){authMessage(e.message)}
+}
+$('showRegister').addEventListener('click',()=>{$('parentLoginForm').classList.add('hidden');$('parentRegisterForm').classList.remove('hidden');authMessage('')});
+$('showLogin').addEventListener('click',()=>{$('parentRegisterForm').classList.add('hidden');$('parentLoginForm').classList.remove('hidden');authMessage('')});
+$('parentLoginForm').addEventListener('submit',e=>{e.preventDefault();parentAuthRequest('/api/public/parent/login',{email:$('parentLoginEmail').value,password:$('parentLoginPassword').value})});
+$('parentRegisterForm').addEventListener('submit',e=>{e.preventDefault();if($('parentRegisterPassword').value!==$('parentConfirmPassword').value){authMessage('Passwords do not match.');return}parentAuthRequest('/api/public/parent/register',{name:$('parentName').value,email:$('parentRegisterEmail').value,password:$('parentRegisterPassword').value})});
+$('parentLogout').addEventListener('click',async()=>{try{await fetch('/api/admin/logout',{method:'POST',credentials:'same-origin'})}catch{}parentAccount=null;parentApplications=[];correctionRecord=null;record=null;form.reset();DOCS.forEach(d=>files[d.key]=[]);$('profile').replaceChildren();for(const id of ['parentDashboard','steps','step1','step2','step3'])$(id).classList.add('hidden');$('parentAuth').classList.remove('hidden');$('parentRegisterForm').classList.add('hidden');$('parentLoginForm').classList.remove('hidden');authMessage('You have signed out.')});
+fetch('/api/public/parent/session',{credentials:'same-origin',cache:'no-store'}).then(async r=>{if(r.ok){const d=await r.json();showParentAccount(d.user)}}).catch(()=>{});
 
 function showStep(n){
   ['step1','step2','step3'].forEach((id,i)=> $(id).classList.toggle('hidden', i !== n-1));
@@ -449,6 +481,7 @@ $('apply').addEventListener('click', () => {
 
 /* ---------- step 2: documents ---------- */
 function renderDocs(){
+  $('documentInstructions').textContent=correctionRecord?'Your previously submitted documents will remain attached. Add any replacement documents below if needed.':'Upload each required document as a PDF or a clear photo (JPG or PNG, up to 5 MB each). Every item must have at least one file before you can submit.';
   const host = $('docList'); host.replaceChildren();
   DOCS.forEach((d,i)=>{
     const box = document.createElement('div'); box.className = 'doc' + (files[d.key].length ? ' ok' : '');
@@ -475,7 +508,7 @@ function renderDocs(){
     });
     box.append(h,p,inp,ul); host.append(box);
   });
-  $('submitApp').disabled = !DOCS.every(d => files[d.key].length);
+  $('submitApp').disabled = correctionRecord ? false : !DOCS.every(d => files[d.key].length);
 }
 $('back').addEventListener('click', () => showStep(1));
 
@@ -494,7 +527,7 @@ $('submitApp').addEventListener('click', async () => {
     }
   }
   const year = data['Year'] || new Date().getFullYear();
-  const ref = 'NMP-' + year + '-' + String(Math.floor(10000 + Math.random()*90000));
+  const ref = correctionRecord ? correctionRecord.reference : 'NMP-' + year + '-' + String(Math.floor(10000 + Math.random()*90000));
   record = {
     reference: ref,
     status: 'Sending to school…',
@@ -509,30 +542,24 @@ $('submitApp').addEventListener('click', async () => {
   };
   let stored = false;
   try {
-    const response = await fetch('/api/public/admissions', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
+    const correction = !!correctionRecord;
+    const response = await fetch(correction ? '/api/public/parent/applications/'+encodeURIComponent(ref) : '/api/public/admissions', {method:correction?'PATCH':'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(record)});
     const result = await response.json();
     if(!response.ok) throw new Error(result.error || 'The school could not receive this application.');
-    record.status = result.status;
-    record.receivedAt = result.receivedAt;
+    if(correction)record=result;
+    else {record.status = result.status;record.receivedAt = result.receivedAt;}
     stored = true;
   } catch(error) {
-    record.status = 'Not sent to school — saved on this device only';
     $('err2').style.display = 'block';
-    $('err2').textContent = error.message + ' Keep this page open and contact the school before assuming the application was received.';
+    $('err2').textContent = error.message + ' The application was not submitted. Your information was not saved on this device.';
+    $('submitApp').disabled = false;
+    return;
   }
-  const list = loadAll(); list.push(slim(record));
-  saveAll(list);
+  correctionRecord=null;
   renderProfile(record, stored);
-  renderSaved();
+  refreshParentApplications();
   showStep(3);
 });
-
-// Stored copy keeps the form data and document names; file contents stay in the downloaded JSON.
-function slim(r){
-  const c = JSON.parse(JSON.stringify(r));
-  Object.keys(c.documents).forEach(k => c.documents[k] = c.documents[k].map(({name,type,sizeKB}) => ({name,type,sizeKB})));
-  return c;
-}
 
 function section(title, pairs){
   const frag = document.createDocumentFragment();
@@ -560,6 +587,12 @@ function renderProfile(r, stored){
   note.textContent = stored ? 'The school server received this application. Keep your reference number for follow-up.' : 'The application was saved only on this device and has NOT been sent to the school. Download it and contact the school to submit it.';
   p.append(note);
 }
+async function openParentApplication(reference,edit){
+  try{const r=await fetch('/api/public/parent/applications/'+encodeURIComponent(reference),{credentials:'same-origin',cache:'no-store'});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not open this application.');
+    if(edit){if(data.status!=='Rejected')throw new Error('Only rejected applications can be corrected.');correctionRecord=data;$('gradeFor').value=data.application['Grade applied for']||'';applyGrade();for(const el of form.elements){if(!el.name||!Object.prototype.hasOwnProperty.call(data.application,el.name))continue;const value=data.application[el.name];if(el.type==='radio')el.checked=el.value===value;else if(el.type!=='checkbox')el.value=value} $('decl').checked=true;$('err').style.display='none';showStep(1);renderDocs();return}
+    record=data;renderProfile(data,true);showStep(3);
+  }catch(e){if(parentAccount)$('parentApplications').textContent=e.message;else authMessage(e.message)}
+}
 
 /* ---------- downloads ---------- */
 function download(name, text, mime){
@@ -578,27 +611,8 @@ $('dlJson').addEventListener('click', () => download(record.reference + '.json',
 $('dlCsv').addEventListener('click', () => download(record.reference + '.csv', toCsv(record), 'text/csv'));
 $('print').addEventListener('click', () => window.print());
 $('newApp').addEventListener('click', () => {
-  form.reset(); DOCS.forEach(d => files[d.key] = []); record = null; applyGrade(); showStep(1);
+  form.reset(); DOCS.forEach(d => files[d.key] = []); record = null; correctionRecord=null; applyGrade(); showStep(1);renderDocs();
 });
-
-/* ---------- saved profiles ---------- */
-function renderSaved(){
-  const list = loadAll(); const ul = $('savedList'); ul.replaceChildren();
-  $('savedSum').textContent = 'Saved learner profiles (' + list.length + ')';
-  list.slice().reverse().forEach(r=>{
-    const li = document.createElement('li');
-    const s = document.createElement('span'); s.textContent = r.reference + ' \u2013 ' + r.learner.fullName + ', ' + r.learner.gradeAppliedFor;
-    const box = document.createElement('span');
-    const j = document.createElement('button'); j.type = 'button'; j.className = 'secondary'; j.textContent = 'JSON';
-    j.addEventListener('click', () => download(r.reference + '.json', JSON.stringify(r, null, 2), 'application/json'));
-    const c = document.createElement('button'); c.type = 'button'; c.className = 'secondary'; c.textContent = 'CSV';
-    c.addEventListener('click', () => download(r.reference + '.csv', toCsv(r), 'text/csv'));
-    const v = document.createElement('button'); v.type = 'button'; v.className = 'secondary'; v.textContent = 'View';
-    v.addEventListener('click', () => { record = r; renderProfile(r, true); showStep(3); });
-    box.append(v, ' ', j, ' ', c); li.append(s, box); ul.append(li);
-  });
-}
-renderSaved();
 </script>
 </body>
 </html>

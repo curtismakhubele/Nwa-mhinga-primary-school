@@ -102,6 +102,13 @@ function requireSchoolManager(req, res, next) {
   req.schoolUser = user.user;
   next();
 }
+function requireParent(req, res, next) {
+  const user = currentUser(req);
+  if (!user) return sendError(res, 401, "Parent account sign-in required.");
+  if (user.user.role !== "Parent") return sendError(res, 403, "Sign in with a parent or guardian account.");
+  req.schoolUser = user.user;
+  next();
+}
 const userRoles = new Set(["Admin", "Principal", "Vice Principal", "Teacher", "Parent", "Learner"]);
 function publicUser(user) {
   const { passwordHash, passwordSalt, ...safe } = user;
@@ -242,6 +249,39 @@ app.post("/api/admin/login", (req, res) => {
   res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
   res.set("Cache-Control", "no-store");
   res.json({ authenticated: true, user: signedInUser });
+});
+app.post("/api/public/parent/register", async (req, res, next) => {
+  try {
+    const name = String(req.body?.name || "").trim();
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = String(req.body?.password || "");
+    if (!name || name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 256) return sendError(res, 400, "Enter your name, a valid email, and a password of at least 8 characters.");
+    if ((state.users || []).some(user => user.email === email) || [appSetting("SCHOOL_ADMIN_EMAIL"), appSetting("SCHOOL_ADMIN_TEST_EMAIL")].some(value => value.trim().toLowerCase() === email)) return sendError(res, 409, "An account with this email already exists. Sign in instead.");
+    const { salt, hash } = hashPassword(password);
+    const user = { id: "U" + crypto.randomBytes(6).toString("hex"), name, email, role: "Parent", status: "Active", assignedGrade: "All", assignedClass: "All", learnerId: "", passwordSalt: salt, passwordHash: hash };
+    state.users = [...(state.users || []), user];
+    await saveState();
+    const safe = publicUser(user), token = crypto.randomBytes(32).toString("base64url");
+    sessions.set(token, { user: safe, expiresAt: Date.now() + sessionLifetimeMs });
+    res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
+    res.set("Cache-Control", "no-store");
+    res.status(201).json({ user: safe });
+  } catch (err) { next(err); }
+});
+app.post("/api/public/parent/login", (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const password = String(req.body?.password || "");
+  const user = (state.users || []).find(row => row.email === email && row.role === "Parent" && row.status === "Active" && passwordMatches(password, row));
+  if (!user) return sendError(res, 401, "Invalid parent account email or password.");
+  const safe = publicUser(user), token = crypto.randomBytes(32).toString("base64url");
+  sessions.set(token, { user: safe, expiresAt: Date.now() + sessionLifetimeMs });
+  res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
+  res.set("Cache-Control", "no-store");
+  res.json({ user: safe });
+});
+app.get("/api/public/parent/session", requireParent, (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ user: req.schoolUser });
 });
 app.post("/api/admin/logout", requireAuth, (req, res) => {
   const token = cookieValue(req, "nwa_admin_session");
@@ -430,13 +470,12 @@ app.patch("/api/admin/admissions/:reference", requireSchoolManager, async (req, 
   try {
     const record = (state.admissions || []).find(x => x.reference === req.params.reference);
     if (!record) return sendError(res, 404, "Application not found.");
-    const { learner, application, status, adminNotes } = req.body || {};
+    const { learner, application, adminNotes } = req.body || {};
     if (!learner || typeof learner !== "object" || Array.isArray(learner) || !application || typeof application !== "object" || Array.isArray(application)) return sendError(res, 400, "Learner and application fields must be valid objects.");
     if (JSON.stringify({ learner, application }).length > 2 * 1024 * 1024) return sendError(res, 413, "Edited application fields are too large.");
-    if (typeof status !== "string" || status.length > 80 || typeof adminNotes !== "string" || adminNotes.length > 4000) return sendError(res, 400, "Status or admin notes are invalid.");
+    if (typeof adminNotes !== "string" || adminNotes.length > 4000) return sendError(res, 400, "Admin notes are invalid.");
     record.learner = learner;
     record.application = application;
-    record.status = status.trim() || "Received by school";
     record.adminNotes = adminNotes;
     record.updatedAt = new Date().toISOString();
     await saveState();
@@ -451,7 +490,99 @@ app.get("/api/admin/admissions/:reference/download", requireSchoolManager, (req,
   res.set("Content-Disposition", `attachment; filename="${record.reference}.json"`);
   res.type("application/json").send(JSON.stringify(record, null, 2));
 });
-app.post("/api/public/admissions", async (req, res, next) => {
+app.delete("/api/admin/admissions/:reference", requireSchoolManager, async (req, res, next) => {
+  try {
+    const before = state.admissions || [];
+    state.admissions = before.filter(row => row.reference !== req.params.reference);
+    if (before.length === state.admissions.length) return sendError(res, 404, "Application not found in the inbox.");
+    await saveState();
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+app.post("/api/admin/admissions/:reference/decision", requireSchoolManager, async (req, res, next) => {
+  try {
+    const index = (state.admissions || []).findIndex(row => row.reference === req.params.reference);
+    if (index < 0) return sendError(res, 404, "Application not found in the inbox.");
+    const record = state.admissions[index];
+    const action = String(req.body?.action || "");
+    if (action === "reject") {
+      const message = String(req.body?.parentMessage || "").trim();
+      if (!message || message.length > 2000) return sendError(res, 400, "Enter a parent-facing correction message (up to 2,000 characters).");
+      record.status = "Rejected";
+      record.parentMessage = message;
+      record.rejectedAt = new Date().toISOString();
+    } else if (action === "approve") {
+      record.status = "Approved";
+      record.approvedAt = new Date().toISOString();
+      record.applicationNumber = record.applicationNumber || "NMP-APP-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+      state.approvedApplications = Array.isArray(state.approvedApplications) ? state.approvedApplications : [];
+      state.approvedApplications.unshift(record);
+      state.admissions.splice(index, 1);
+    } else return sendError(res, 400, "Choose approve or reject.");
+    await saveState();
+    res.json({ ok: true, status: record.status, applicationNumber: record.applicationNumber || null });
+  } catch (err) { next(err); }
+});
+app.get("/api/admin/approved-applications", requireSchoolManager, (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ items: (state.approvedApplications || []).map(({ reference, applicationNumber, learner, receivedAt, approvedAt }) => ({ reference, applicationNumber, learner, receivedAt, approvedAt })) });
+});
+app.get("/api/admin/approved-applications/:reference", requireSchoolManager, (req, res) => {
+  const record = (state.approvedApplications || []).find(row => row.reference === req.params.reference);
+  if (!record) return sendError(res, 404, "Approved application not found.");
+  res.set("Cache-Control", "no-store");
+  res.json(record);
+});
+app.get("/api/admin/approved-applications/:reference/download", requireSchoolManager, (req, res) => {
+  const record = (state.approvedApplications || []).find(row => row.reference === req.params.reference);
+  if (!record) return sendError(res, 404, "Approved application not found.");
+  res.set("Cache-Control", "no-store");
+  res.set("Content-Disposition", `attachment; filename="${record.reference}.json"`);
+  res.type("application/json").send(JSON.stringify(record, null, 2));
+});
+function parentApplicationView(record) {
+  const { ownerId, adminNotes, ...safe } = record;
+  return safe;
+}
+app.get("/api/public/parent/applications", requireParent, (req, res) => {
+  const ownerId = req.schoolUser.id;
+  const items = [...(state.admissions || []), ...(state.approvedApplications || [])]
+    .filter(row => row.ownerId === ownerId)
+    .map(({ reference, applicationNumber, learner, status, submittedAt, receivedAt, updatedAt, approvedAt, parentMessage }) => ({ reference, applicationNumber, learner, status, submittedAt, receivedAt, updatedAt, approvedAt, parentMessage }));
+  res.set("Cache-Control", "no-store");
+  res.json({ items });
+});
+app.get("/api/public/parent/applications/:reference", requireParent, (req, res) => {
+  const ownerId = req.schoolUser.id;
+  const record = [...(state.admissions || []), ...(state.approvedApplications || [])].find(row => row.reference === req.params.reference && row.ownerId === ownerId);
+  if (!record) return sendError(res, 404, "Application not found for this parent account.");
+  res.set("Cache-Control", "no-store");
+  res.json(parentApplicationView(record));
+});
+app.patch("/api/public/parent/applications/:reference", requireParent, async (req, res, next) => {
+  try {
+    const record = (state.admissions || []).find(row => row.reference === req.params.reference && row.ownerId === req.schoolUser.id);
+    if (!record) return sendError(res, 404, "Application not found for this parent account.");
+    if (record.status !== "Rejected") return sendError(res, 409, "Only rejected applications can be corrected and resubmitted.");
+    const { learner, application, documents } = req.body || {};
+    if (!learner || typeof learner !== "object" || Array.isArray(learner) || !learner.fullName || !application || typeof application !== "object" || Array.isArray(application)) return sendError(res, 400, "The corrected application is incomplete.");
+    if (documents && (typeof documents !== "object" || Array.isArray(documents))) return sendError(res, 400, "Submitted documents are invalid.");
+    if (JSON.stringify({ learner, application, documents }).length > 8 * 1024 * 1024) return sendError(res, 413, "Corrected application is too large.");
+    record.learner = learner;
+    record.application = application;
+    if (documents && Object.values(documents).some(items => Array.isArray(items) && items.length)) {
+      for (const [key, items] of Object.entries(documents)) if (Array.isArray(items) && items.length) record.documents[key] = [...(record.documents[key] || []), ...items];
+    }
+    record.status = "Received by school";
+    record.parentMessage = "";
+    record.updatedAt = new Date().toISOString();
+    record.resubmittedAt = record.updatedAt;
+    await saveState();
+    res.set("Cache-Control", "no-store");
+    res.json(parentApplicationView(record));
+  } catch (err) { next(err); }
+});
+app.post("/api/public/admissions", requireParent, async (req, res, next) => {
   try {
     const record = req.body;
     if (!record || !/^NMP-\d{4}-\d{5}$/.test(String(record.reference || "")) || !record.learner?.fullName || !record.application || typeof record.application !== "object") return sendError(res, 400, "The application is incomplete.");
@@ -459,8 +590,8 @@ app.post("/api/public/admissions", async (req, res, next) => {
     if (serialized.length > 8 * 1024 * 1024) return sendError(res, 413, "Application is too large. Save fewer/smaller documents and retry.");
     const admissions = Array.isArray(state.admissions) ? state.admissions : [];
     if (Buffer.byteLength(JSON.stringify(admissions)) + Buffer.byteLength(serialized) > 80 * 1024 * 1024) return sendError(res, 413, "The school application storage quota is full.");
-    if (admissions.some(x => x.reference === record.reference)) return sendError(res, 409, "This application reference was already submitted.");
-    const saved = { ...record, status: "Received by school", receivedAt: new Date().toISOString() };
+    if ([...admissions, ...(state.approvedApplications || [])].some(x => x.reference === record.reference)) return sendError(res, 409, "This application reference was already submitted.");
+    const saved = { ...record, ownerId: req.schoolUser.id, status: "Received by school", parentMessage: "", receivedAt: new Date().toISOString() };
     admissions.unshift(saved);
     state.admissions = admissions;
     await saveState();
@@ -615,6 +746,7 @@ async function start() {
   catch (err) { if (err.code !== "ENOENT") throw err; await saveState(); }
   if (!Array.isArray(state.items)) state.items = [];
   if (!Array.isArray(state.admissions)) state.admissions = [];
+  if (!Array.isArray(state.approvedApplications)) state.approvedApplications = [];
   if (!Array.isArray(state.users)) state.users = [];
   if (!state.schoolData || typeof state.schoolData !== "object") state.schoolData = null;
   app.listen(port, "0.0.0.0", () => console.log("N'wa Mhinga portal listening on port " + port));

@@ -177,7 +177,7 @@ window.removeMedia = async function(id) {
 window.me = function() { return window.apiUser || localPortalMe(); };
 window.can = function(page) {
   if (window.apiUser) {
-    if (["media","admissions"].includes(page)) return ["Admin","Principal"].includes(window.apiUser.role);
+    if (["media","admissions","applicationWorkspace"].includes(page)) return ["Admin","Principal"].includes(window.apiUser.role);
     return (db.permissions?.[window.apiUser.role] || []).includes(page);
   }
   return localPortalCan(page);
