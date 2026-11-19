@@ -107,11 +107,12 @@ function requireParent(req, res, next) {
   if (!user) return sendError(res, 401, "Parent account sign-in required.");
   if (user.user.role !== "Parent") return sendError(res, 403, "Sign in with a parent or guardian account.");
   req.schoolUser = user.user;
+  req.parentAccount = (state.users || []).find(row => row.id === user.user.id) || null;
   next();
 }
 const userRoles = new Set(["Admin", "Principal", "Vice Principal", "Teacher", "Parent", "Learner"]);
 function publicUser(user) {
-  const { passwordHash, passwordSalt, ...safe } = user;
+  const { passwordHash, passwordSalt, idPassportHash, ...safe } = user;
   return safe;
 }
 function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
@@ -254,11 +255,13 @@ app.post("/api/public/parent/register", async (req, res, next) => {
   try {
     const name = String(req.body?.name || "").trim();
     const email = String(req.body?.email || "").trim().toLowerCase();
+    const idPassport = normalizeParentIdentifier(req.body?.idPassport);
     const password = String(req.body?.password || "");
-    if (!name || name.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 256) return sendError(res, 400, "Enter your name, a valid email, and a password of at least 8 characters.");
-    if ((state.users || []).some(user => user.email === email) || [appSetting("SCHOOL_ADMIN_EMAIL"), appSetting("SCHOOL_ADMIN_TEST_EMAIL")].some(value => value.trim().toLowerCase() === email)) return sendError(res, 409, "An account with this email already exists. Sign in instead.");
+    if (!name || name.length > 120 || idPassport.length < 4 || idPassport.length > 32 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8 || password.length > 256) return sendError(res, 400, "Enter your name, ID/passport, a valid email, and a password of at least 8 characters.");
+    const idHash = parentIdentifierHash(idPassport);
+    if ((state.users || []).some(user => user.email === email || user.idPassportHash === idHash) || [appSetting("SCHOOL_ADMIN_EMAIL"), appSetting("SCHOOL_ADMIN_TEST_EMAIL")].some(value => value.trim().toLowerCase() === email)) return sendError(res, 409, "An account with this email or ID/passport already exists. Sign in instead.");
     const { salt, hash } = hashPassword(password);
-    const user = { id: "U" + crypto.randomBytes(6).toString("hex"), name, email, role: "Parent", status: "Active", assignedGrade: "All", assignedClass: "All", learnerId: "", passwordSalt: salt, passwordHash: hash };
+    const user = { id: "U" + crypto.randomBytes(6).toString("hex"), name, email, role: "Parent", status: "Active", assignedGrade: "All", assignedClass: "All", learnerId: "", idPassportHash: idHash, passwordSalt: salt, passwordHash: hash };
     state.users = [...(state.users || []), user];
     await saveState();
     const safe = publicUser(user), token = crypto.randomBytes(32).toString("base64url");
@@ -269,10 +272,13 @@ app.post("/api/public/parent/register", async (req, res, next) => {
   } catch (err) { next(err); }
 });
 app.post("/api/public/parent/login", (req, res) => {
-  const email = String(req.body?.email || "").trim().toLowerCase();
+  const identifier = String(req.body?.idPassport || "").trim();
+  const normalizedIdentifier = normalizeParentIdentifier(identifier);
+  const identifierHash = parentIdentifierHash(normalizedIdentifier);
   const password = String(req.body?.password || "");
-  const user = (state.users || []).find(row => row.email === email && row.role === "Parent" && row.status === "Active" && passwordMatches(password, row));
-  if (!user) return sendError(res, 401, "Invalid parent account email or password.");
+  const legacyEmail = identifier.toLowerCase();
+  const user = (state.users || []).find(row => row.role === "Parent" && row.status === "Active" && (row.idPassportHash === identifierHash || (!row.idPassportHash && row.email === legacyEmail)) && passwordMatches(password, row));
+  if (!user) return sendError(res, 401, "Invalid ID/passport or password.");
   const safe = publicUser(user), token = crypto.randomBytes(32).toString("base64url");
   sessions.set(token, { user: safe, expiresAt: Date.now() + sessionLifetimeMs });
   res.setHeader("Set-Cookie", "nwa_admin_session=" + encodeURIComponent(token) + "; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=" + Math.floor(sessionLifetimeMs / 1000));
@@ -544,6 +550,12 @@ function parentApplicationView(record) {
   const { ownerId, adminNotes, ...safe } = record;
   return safe;
 }
+function normalizeParentIdentifier(value) {
+  return String(value || "").trim().replace(/[\s-]+/g, "").toUpperCase();
+}
+function parentIdentifierHash(value) {
+  return crypto.createHash("sha256").update(normalizeParentIdentifier(value)).digest("hex");
+}
 app.get("/api/public/parent/applications", requireParent, (req, res) => {
   const ownerId = req.schoolUser.id;
   const items = [...(state.admissions || []), ...(state.approvedApplications || [])]
@@ -566,6 +578,7 @@ app.patch("/api/public/parent/applications/:reference", requireParent, async (re
     if (record.status !== "Rejected") return sendError(res, 409, "Only rejected applications can be corrected and resubmitted.");
     const { learner, application, documents } = req.body || {};
     if (!learner || typeof learner !== "object" || Array.isArray(learner) || !learner.fullName || !application || typeof application !== "object" || Array.isArray(application)) return sendError(res, 400, "The corrected application is incomplete.");
+    if (req.parentAccount?.idPassportHash && parentIdentifierHash(application["Parent ID / passport"]) !== req.parentAccount.idPassportHash) return sendError(res, 403, "Use the ID/passport linked to your parent account.");
     if (documents && (typeof documents !== "object" || Array.isArray(documents))) return sendError(res, 400, "Submitted documents are invalid.");
     if (JSON.stringify({ learner, application, documents }).length > 8 * 1024 * 1024) return sendError(res, 413, "Corrected application is too large.");
     record.learner = learner;
@@ -586,6 +599,7 @@ app.post("/api/public/admissions", requireParent, async (req, res, next) => {
   try {
     const record = req.body;
     if (!record || !/^NMP-\d{4}-\d{5}$/.test(String(record.reference || "")) || !record.learner?.fullName || !record.application || typeof record.application !== "object") return sendError(res, 400, "The application is incomplete.");
+    if (req.parentAccount?.idPassportHash && parentIdentifierHash(record.application["Parent ID / passport"]) !== req.parentAccount.idPassportHash) return sendError(res, 403, "Enter the ID/passport used to create your parent account.");
     const serialized = JSON.stringify(record);
     if (serialized.length > 8 * 1024 * 1024) return sendError(res, 413, "Application is too large. Save fewer/smaller documents and retry.");
     const admissions = Array.isArray(state.admissions) ? state.admissions : [];

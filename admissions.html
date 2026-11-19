@@ -78,6 +78,19 @@
   .parent-card h2{margin-top:0}
   .parent-item{padding:12px 0;border-bottom:1px solid var(--line)}
   .parent-item:last-child{border:0}
+  .parent-auth-card{max-width:560px;margin:24px auto 30px;padding:28px 32px 24px;border-top:5px solid var(--accent);border-radius:4px;box-shadow:0 10px 30px #081a2915;text-align:center}
+  .auth-brand img{width:110px;height:105px;object-fit:contain;display:block;margin:0 auto 8px}
+  .auth-brand strong{color:var(--ink);letter-spacing:.04em}
+  .auth-title{margin:20px 0 8px!important;color:#075095;font:500 2rem/1.2 "Segoe UI",system-ui,sans-serif}
+  .auth-lead{max-width:380px;margin:0 auto 24px;color:#a58c53;font-size:1.05rem}
+  .auth-fields{text-align:left;max-width:430px;margin:0 auto}
+  .parent-auth-card input{border-radius:28px;padding:13px 18px;background:#fff;border-color:var(--accent)}
+  .auth-actions{max-width:430px;margin:20px auto 8px;display:grid;gap:12px}
+  .auth-actions button,.auth-actions a{width:100%;min-height:54px;border:0;border-radius:30px;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:1.05rem}
+  .auth-primary{background:#aa9256;color:#fff}
+  .auth-home{background:#075095;color:#fff}
+  .auth-switch{color:#075095;background:transparent;border:0;padding:4px 8px;text-decoration:underline}
+  @media(max-width:560px){.parent-auth-card{padding:22px 16px}.auth-title{font-size:1.7rem}}
   @media print{
     body{background:#fff;color:#000}.actions,.steps,.note,header.head p,.noprint{display:none}
     .profile{border-color:#000}
@@ -105,18 +118,19 @@
 <nav style="margin:-2px 0 14px"><a href="./index.html" style="color:var(--accent);font-weight:700">← Back to school portal</a></nav>
 <p class="note"><strong>Application portal:</strong> Create or sign in to a parent account before applying. Applications and learner details are visible only to the parent account and authorized school staff.</p>
 
-<section class="parent-card" id="parentAuth">
+<section class="parent-card parent-auth-card" id="parentAuth">
+  <div class="auth-brand"><img src="./nwa-mhinga-p-logo.png" alt="N'wa Mhinga Primary School logo"><strong>N'WA MHINGA PRIMARY SCHOOL</strong></div>
   <div id="parentAuthMessage" class="err" role="alert"></div>
   <form id="parentLoginForm">
-    <h2>Parent / guardian sign in</h2>
-    <div class="grid"><div class="c6"><label for="parentLoginEmail">Email address</label><input id="parentLoginEmail" type="email" autocomplete="username" required></div><div class="c6"><label for="parentLoginPassword">Password</label><input id="parentLoginPassword" type="password" autocomplete="current-password" required></div></div>
-    <div class="actions"><button class="primary">Sign in</button><button class="secondary" type="button" id="showRegister">Create parent account</button></div>
+    <h2 class="auth-title">Parent Login</h2><p class="auth-lead">Enter the ID or passport and password you used to create your parent account.</p>
+    <div class="auth-fields"><label for="parentLoginId">ID / Passport</label><input id="parentLoginId" type="text" placeholder="ID / Passport" autocomplete="username" required maxlength="32"><div style="height:14px"></div><label for="parentLoginPassword">Password</label><input id="parentLoginPassword" type="password" placeholder="Password" autocomplete="current-password" required></div>
+    <div class="auth-actions"><button class="auth-primary">Sign In</button><a class="auth-home" href="./index.html">Back to Home</a></div>
+    <p class="hint">New to the application portal? <button class="auth-switch" type="button" id="showRegister">Create parent account</button></p>
   </form>
   <form id="parentRegisterForm" class="hidden">
-    <h2>Create parent / guardian account</h2>
-    <p class="hint">Create your account first. You will use it to submit and track your child’s application.</p>
-    <div class="grid"><div class="c12"><label for="parentName">Parent / guardian full name</label><input id="parentName" type="text" autocomplete="name" required maxlength="120"></div><div class="c6"><label for="parentRegisterEmail">Email address</label><input id="parentRegisterEmail" type="email" autocomplete="email" required></div><div class="c6"><label for="parentRegisterPassword">Password (at least 8 characters)</label><input id="parentRegisterPassword" type="password" autocomplete="new-password" minlength="8" required></div><div class="c6"><label for="parentConfirmPassword">Confirm password</label><input id="parentConfirmPassword" type="password" autocomplete="new-password" minlength="8" required></div></div>
-    <div class="actions"><button class="primary">Create account</button><button class="secondary" type="button" id="showLogin">Back to sign in</button></div>
+    <h2 class="auth-title">Create Parent Account</h2><p class="auth-lead">Sign up first. Use these same credentials to apply, check your application and make corrections.</p>
+    <div class="auth-fields"><label for="parentName">Parent / guardian full name</label><input id="parentName" type="text" autocomplete="name" required maxlength="120"><div style="height:12px"></div><label for="parentRegisterId">ID / Passport</label><input id="parentRegisterId" type="text" placeholder="ID / Passport" autocomplete="username" required maxlength="32"><div style="height:12px"></div><label for="parentRegisterEmail">Email address</label><input id="parentRegisterEmail" type="email" autocomplete="email" required><div style="height:12px"></div><label for="parentRegisterPassword">Password (at least 8 characters)</label><input id="parentRegisterPassword" type="password" autocomplete="new-password" minlength="8" required><div style="height:12px"></div><label for="parentConfirmPassword">Confirm password</label><input id="parentConfirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div class="auth-actions"><button class="auth-primary">Create Account</button><button class="auth-home" type="button" id="showLogin">Back to Sign In</button></div>
   </form>
 </section>
 <section class="parent-card hidden" id="parentDashboard"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h2 style="margin-bottom:0">Parent application workspace</h2><span id="parentWelcome" class="hint"></span></div><button id="parentLogout" class="secondary" type="button">Sign out</button></div><div id="parentApplications"></div></section>
@@ -377,10 +391,12 @@ let parentApplications = [];
 let correctionRecord = null;
 
 function authMessage(message){const box=$('parentAuthMessage');box.textContent=message;box.style.display=message?'block':'none'}
-function showParentAccount(user){
+function showParentAccount(user,identifier=''){
   parentAccount=user;
   $('parentAuth').classList.add('hidden');$('parentDashboard').classList.remove('hidden');$('steps').classList.remove('hidden');$('step1').classList.remove('hidden');
   $('parentWelcome').textContent='Signed in as '+user.name+' · '+user.email;
+  if(user.email&&!$('pmail').value)$('pmail').value=user.email;
+  if(identifier&&!identifier.includes('@')){$('pid').value=identifier;$('pid').readOnly=true}else $('pid').readOnly=false;
   refreshParentApplications();
 }
 async function refreshParentApplications(){
@@ -398,13 +414,13 @@ async function refreshParentApplications(){
 }
 async function parentAuthRequest(path,payload){
   authMessage('');
-  try{const r=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not sign in.');showParentAccount(d.user)}catch(e){authMessage(e.message)}
+  try{const r=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not sign in.');showParentAccount(d.user,payload.idPassport)}catch(e){authMessage(e.message)}
 }
 $('showRegister').addEventListener('click',()=>{$('parentLoginForm').classList.add('hidden');$('parentRegisterForm').classList.remove('hidden');authMessage('')});
 $('showLogin').addEventListener('click',()=>{$('parentRegisterForm').classList.add('hidden');$('parentLoginForm').classList.remove('hidden');authMessage('')});
-$('parentLoginForm').addEventListener('submit',e=>{e.preventDefault();parentAuthRequest('/api/public/parent/login',{email:$('parentLoginEmail').value,password:$('parentLoginPassword').value})});
-$('parentRegisterForm').addEventListener('submit',e=>{e.preventDefault();if($('parentRegisterPassword').value!==$('parentConfirmPassword').value){authMessage('Passwords do not match.');return}parentAuthRequest('/api/public/parent/register',{name:$('parentName').value,email:$('parentRegisterEmail').value,password:$('parentRegisterPassword').value})});
-$('parentLogout').addEventListener('click',async()=>{try{await fetch('/api/admin/logout',{method:'POST',credentials:'same-origin'})}catch{}parentAccount=null;parentApplications=[];correctionRecord=null;record=null;form.reset();DOCS.forEach(d=>files[d.key]=[]);$('profile').replaceChildren();for(const id of ['parentDashboard','steps','step1','step2','step3'])$(id).classList.add('hidden');$('parentAuth').classList.remove('hidden');$('parentRegisterForm').classList.add('hidden');$('parentLoginForm').classList.remove('hidden');authMessage('You have signed out.')});
+$('parentLoginForm').addEventListener('submit',e=>{e.preventDefault();parentAuthRequest('/api/public/parent/login',{idPassport:$('parentLoginId').value,password:$('parentLoginPassword').value})});
+$('parentRegisterForm').addEventListener('submit',e=>{e.preventDefault();if($('parentRegisterPassword').value!==$('parentConfirmPassword').value){authMessage('Passwords do not match.');return}parentAuthRequest('/api/public/parent/register',{name:$('parentName').value,idPassport:$('parentRegisterId').value,email:$('parentRegisterEmail').value,password:$('parentRegisterPassword').value})});
+$('parentLogout').addEventListener('click',async()=>{try{await fetch('/api/admin/logout',{method:'POST',credentials:'same-origin'})}catch{}parentAccount=null;parentApplications=[];correctionRecord=null;record=null;form.reset();pid.readOnly=false;DOCS.forEach(d=>files[d.key]=[]);$('profile').replaceChildren();for(const id of ['parentDashboard','steps','step1','step2','step3'])$(id).classList.add('hidden');$('parentAuth').classList.remove('hidden');$('parentRegisterForm').classList.add('hidden');$('parentLoginForm').classList.remove('hidden');authMessage('You have signed out.')});
 fetch('/api/public/parent/session',{credentials:'same-origin',cache:'no-store'}).then(async r=>{if(r.ok){const d=await r.json();showParentAccount(d.user)}}).catch(()=>{});
 
 function showStep(n){
