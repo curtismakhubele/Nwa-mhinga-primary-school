@@ -6,7 +6,7 @@ const apiVersion = /^v\d+\.\d+$/.test(process.env.WHATSAPP_API_VERSION || "")
 const seenMessages = new Map();
 
 const faq = [
-  { keys: ["admission", "apply", "application", "enrol", "enroll", "register child"], text: "To apply, open the N'wa Mhinga school portal, choose Admissions, and create a parent account first. Sign in with that same ID/passport and password to submit, view, or amend an application." },
+  { keys: ["admission", "apply", "application", "enrol", "enroll", "register child"], text: "To apply, open the school portal, choose Admissions, and create a parent account first. Sign in with that same ID/passport and password to submit, view, or amend an application: https://nwa-mhinga-p-aydjh8aue4cfane6.southafricanorth-01.azurewebsites.net/admissions.html" },
   { keys: ["track", "check application", "status", "amend", "edit application", "rejected"], text: "Open Admissions and sign in with the ID/passport and password you used when applying. Your application status and school messages are in your parent workspace. Rejected applications can be corrected and resubmitted there." },
   { keys: ["grade", "grades", "grade r", "school level"], text: "N'wa Mhinga Primary School serves Grade R through Grade 7." },
   { keys: ["address", "location", "directions", "map", "where"], text: "The school is at Ntsu Street and Ramosa Street, Saulsville, Pretoria, 0125. Directions: https://www.google.com/maps/dir/?api=1&destination=-25.77897%2C28.05932" },

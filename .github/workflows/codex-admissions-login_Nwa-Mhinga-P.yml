@@ -29,8 +29,23 @@ jobs:
           tenant-id: ca9a8b8c-3ea3-4799-a43e-5510398e7a3b
           subscription-id: 673e191b-c929-489b-9843-81abef0b119e
 
+      - name: Start App Service if stopped
+        shell: bash
+        run: |
+          resource_group=$(az webapp list --query "[?name=='Nwa-Mhinga-P'].resourceGroup | [0]" --output tsv)
+          if [ -z "$resource_group" ]; then
+            echo "Nwa-Mhinga-P was not found or is not visible to the deployment identity."
+            exit 1
+          fi
+          state=$(az webapp show --name Nwa-Mhinga-P --resource-group "$resource_group" --query state --output tsv)
+          echo "Nwa-Mhinga-P state: $state"
+          if [ "$state" != "Running" ]; then
+            az webapp start --name Nwa-Mhinga-P --resource-group "$resource_group"
+          fi
+
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: Nwa-Mhinga-P
           package: .
+
