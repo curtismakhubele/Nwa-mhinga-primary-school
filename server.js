@@ -8,6 +8,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const ffmpegPath = require("ffmpeg-static");
 const sharp = require("sharp");
+const whatsappService = require("./whatsapp-service");
 
 const app = express();
 const port = Number(process.env.PORT || 8080);
@@ -62,7 +63,12 @@ app.use(helmet({
     }
   }
 }));
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "10mb", verify(req, _res, buffer) {
+  if (req.path === "/api/whatsapp/webhook") req.rawBody = Buffer.from(buffer);
+} }));
+app.get("/api/whatsapp/webhook", whatsappService.verifyWebhook);
+app.post("/api/whatsapp/webhook", whatsappService.receiveWebhook);
+app.get("/api/whatsapp/status", whatsappService.status);
 
 function sendError(res, status, message) {
   return res.status(status).json({ error: message });

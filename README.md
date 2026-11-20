@@ -81,3 +81,18 @@ Admins can publish JPG, PNG, WEBP, MP4, WEBM, MP3, M4A, OGG, WAV, and PDF conten
 F1 is a prototype host only. It is not an Azure Blob Storage account, has no production SLA, and cannot support the 250 TB target. Records and admission document attachments are stored in a JSON file in the app's persistent storage; media files are stored on that same limited host. No separate backup is configured. Parent/learner accounts are not yet authenticated against the server, and the current shared records API is administrator-only. Do not use this build for real learner or guardian information until the school has moved to a managed database and object storage, enabled complete role-based accounts, and reviewed privacy, retention, encryption, and backups.
 
 
+## WhatsApp Cloud API chatbot
+The server now exposes `GET` and `POST /api/whatsapp/webhook` for Meta webhook verification and signed message notifications. The WhatsApp bot shares the school's FAQ topics, does not read or store application records, and asks parents to use the signed-in admissions portal for private information. A readiness endpoint is available at `GET /api/whatsapp/status` and returns only whether all credentials are present.
+
+To activate WhatsApp Business Platform for the school's number `084 214 5174`:
+1. In Meta Business/Developer tools, create or select the school's WhatsApp Business Account and add/verify the number. Meta may require SMS/voice verification and the number's two-step PIN. Check how the number is currently used before registering it for Cloud API.
+2. Set these secrets as Azure App Service **App settings** (or Key Vault references); never commit or send them in chat:
+   - `WHATSAPP_VERIFY_TOKEN`: a strong random webhook verification token you choose and enter in Meta.
+   - `WHATSAPP_APP_SECRET`: the Meta app secret, used to validate webhook signatures.
+   - `WHATSAPP_ACCESS_TOKEN`: a long-lived token with the required WhatsApp messaging permissions.
+   - `WHATSAPP_PHONE_NUMBER_ID`: the Meta-assigned ID for `084 214 5174` (not the phone number itself).
+   - `WHATSAPP_API_VERSION`: optional; defaults to `v27.0`.
+3. In Meta's Webhooks configuration, set the callback URL to `https://<your-Azure-host>/api/whatsapp/webhook`, use the same verification token, verify the endpoint, and subscribe to the WhatsApp Business Account `messages` field.
+4. Restart the Azure App Service. `GET /api/whatsapp/status` should report `configured: true` after all four required settings are present.
+
+The app-side API is ready, but live messages require the Meta business account, phone-number ID, access token, app secret, webhook registration, and final number verification. Meta's Cloud API sends messages from the registered phone-number ID using a bearer access token; webhook payload signatures are checked against the app secret.
