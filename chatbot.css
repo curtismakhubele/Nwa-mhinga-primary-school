@@ -1,0 +1,20 @@
+.school-chatbot{position:fixed;right:20px;bottom:20px;z-index:1000;font-family:Inter,"Segoe UI",system-ui,sans-serif;color:#10293d}
+.school-chat-launch{display:flex;align-items:center;gap:9px;border:0;border-radius:999px;padding:13px 18px;background:#c51d2d;color:#fff;font:700 14px Inter,"Segoe UI",system-ui,sans-serif;box-shadow:0 8px 25px #071b2a40;cursor:pointer}
+.school-chat-launch span{font-size:17px}.school-chat-launch:hover{background:#a91524}
+.school-chat-panel{position:absolute;right:0;bottom:64px;width:min(370px,calc(100vw - 32px));height:min(540px,calc(100dvh - 120px));display:flex;flex-direction:column;background:#fff;border:1px solid #d2dce4;border-radius:16px;box-shadow:0 18px 55px #071b2a30;overflow:hidden}
+.school-chat-panel[hidden]{display:none}
+.school-chat-head{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;background:#0b2639;color:#fff}
+.school-chat-head strong,.school-chat-head small{display:block}.school-chat-head small{margin-top:3px;color:#d5e0e8;font-size:11px}
+.school-chat-close{border:0;background:transparent;color:#fff;font-size:25px;line-height:1;cursor:pointer}
+.school-chat-messages{flex:1;overflow-y:auto;padding:15px;background:#f5f7f9}
+.school-chat-message{max-width:90%;margin:0 0 10px;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+.school-chat-message.bot{background:#fff;border:1px solid #e1e6ea;border-top-left-radius:3px}
+.school-chat-message.user{margin-left:auto;background:#075095;color:#fff;border-top-right-radius:3px}
+.school-chat-link{display:inline-block;margin:0 0 12px 4px;color:#075095;font-weight:700;font-size:13px}
+.school-chat-chips{display:flex;gap:6px;overflow-x:auto;padding:0 12px 11px;background:#f5f7f9}
+.school-chat-chips button{flex:none;border:1px solid #d2dce4;border-radius:999px;background:#fff;color:#075095;padding:7px 9px;font-size:11px;cursor:pointer}
+.school-chat-form{display:flex;gap:8px;padding:12px;border-top:1px solid #e1e6ea;background:#fff}
+.school-chat-form input{min-width:0;flex:1;border:1px solid #cbd5df;border-radius:999px;padding:10px 13px;font-size:13px}
+.school-chat-form button{border:0;border-radius:999px;background:#c51d2d;color:#fff;padding:0 14px;font-weight:700;cursor:pointer}
+.school-chat-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+@media(max-width:520px){.school-chatbot{right:12px;bottom:12px}.school-chat-panel{bottom:60px;height:min(520px,calc(100dvh - 100px))}.school-chat-launch{padding:12px 15px}}
